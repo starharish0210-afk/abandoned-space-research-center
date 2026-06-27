@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ECLIPSE-13</title>
+<style>
+  html,body{margin:0;overflow:hidden;background:#000;font-family:'Courier New',monospace;}
+  canvas{display:block;}
+  #hud{position:fixed;top:14px;left:14px;color:#cfe8ff;z-index:5;user-select:none;}
+  #hud .bar{width:180px;height:11px;background:#111;border:1px solid #334;margin-bottom:5px;}
+  #healthFill{height:100%;background:linear-gradient(90deg,#7b0000,#c0392b);width:100%;transition:width .2s;}
+  #ammoLine,#keyLine{font-size:12px;margin-top:4px;text-shadow:0 0 6px #000;letter-spacing:1px;}
+  .keyIcon{display:inline-block;width:11px;height:11px;border:1px solid #888;margin-right:3px;vertical-align:middle;border-radius:2px;}
+  .keyOn.red{background:#e74c3c;box-shadow:0 0 5px #e74c3c;}
+  .keyOn.blue{background:#3498db;box-shadow:0 0 5px #3498db;}
+  .keyOff{background:#1a1a1a;}
+  #crosshair{position:fixed;top:50%;left:50%;width:14px;height:14px;margin:-7px;z-index:5;pointer-events:none;}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(255,255,255,.55);}
+  #crosshair::before{width:1px;height:100%;left:50%;transform:translateX(-50%);}
+  #crosshair::after{height:1px;width:100%;top:50%;transform:translateY(-50%);}
+  #message{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:8px 18px;border-radius:3px;font-size:12px;letter-spacing:1px;opacity:0;transition:opacity .3s;z-index:5;pointer-events:none;white-space:nowrap;border-left:2px solid #e74c3c;}
+  #prompt{position:fixed;bottom:36px;left:50%;transform:translateX(-50%);color:#ffd966;font-size:11px;letter-spacing:2px;opacity:0;transition:opacity .2s;z-index:5;pointer-events:none;text-shadow:0 0 8px #ffd966;}
+  #zoneName{position:fixed;top:14px;left:50%;transform:translateX(-50%);color:#5577aa;font-size:9px;letter-spacing:4px;background:rgba(0,0,0,.55);padding:4px 14px;border-radius:2px;z-index:5;pointer-events:none;opacity:0;transition:opacity 1.5s;}
+  #objective{position:fixed;top:14px;right:14px;color:#8899bb;font-size:10px;line-height:2.1;letter-spacing:1px;background:rgba(0,0,0,.65);padding:8px 14px;border-radius:3px;z-index:5;border-right:2px solid #334;pointer-events:none;}
+  #flashState{margin-top:5px;font-size:9px;color:#445;letter-spacing:2px;}
+  /* Paper log */
+  #logOverlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:10;}
+  #logOverlay .paper{max-width:480px;width:90%;background:#f0e8d4;color:#1a1205;padding:34px 38px;border-radius:2px;font-family:'Courier New',monospace;box-shadow:0 0 80px rgba(0,0,0,.95),0 0 0 1px #c0a880;position:relative;transform:rotate(-0.5deg);}
+  #logOverlay .paper::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(transparent,transparent 27px,rgba(0,0,0,.05) 27px,rgba(0,0,0,.05) 28px);pointer-events:none;border-radius:2px;}
+  #logOverlay .paper h3{margin-top:0;font-size:10px;letter-spacing:3px;color:#6b4a1a;border-bottom:1px solid #c8b89a;padding-bottom:8px;text-transform:uppercase;}
+  #logOverlay .paper .logbody{font-size:13px;line-height:1.95;margin-top:14px;color:#1a1205;white-space:pre-wrap;}
+  #logOverlay .paper .stamp{position:absolute;top:26px;right:30px;font-size:8px;color:#8b4513;letter-spacing:2px;opacity:.7;border:1px solid #8b4513;padding:3px 7px;transform:rotate(4deg);}
+  #logOverlay .paper .hint{margin-top:18px;font-size:9px;color:#8a7a5a;letter-spacing:2px;border-top:1px solid #c8b89a;padding-top:10px;}
+  #logOverlay .paper .dateStamp{font-size:9px;color:#7a6a4a;letter-spacing:2px;margin-bottom:3px;}
+  /* Cutscene */
+  #cutscene{position:fixed;inset:0;background:#000;display:none;z-index:30;overflow:hidden;}
+  #cutsceneText{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#cfe8ff;font-size:14px;line-height:2.3;letter-spacing:2px;max-width:660px;width:90%;transition:opacity .8s;}
+  #cutsceneText h2{color:#ffd966;letter-spacing:6px;font-size:20px;margin-bottom:28px;}
+  #cutsceneText h3{color:#e74c3c;letter-spacing:4px;font-size:16px;margin-top:32px;}
+  #cutsceneText .dim{color:#667788;font-size:12px;}
+  #cutsceneText .ch2title{color:#2ecc71;letter-spacing:8px;font-size:22px;margin-top:44px;display:block;}
+  #cutsceneText .ch2sub{color:#ffd966;font-size:12px;letter-spacing:3px;display:block;margin-top:6px;}
+  #cutsceneText button{margin-top:30px;background:transparent;color:#cfe8ff;border:1px solid #446;padding:11px 28px;font-size:11px;letter-spacing:4px;cursor:pointer;font-family:'Courier New',monospace;}
+  #cutsceneText button:hover{background:#0d1a2a;}
+
+  /* Chapter 2 HUD additions */
+  #staminaBar{width:180px;height:6px;background:#111;border:1px solid #334;margin-top:4px;}
+  #staminaFill{height:100%;background:linear-gradient(90deg,#1a6644,#2ecc71);width:100%;transition:width .1s;}
+  #weaponLine{font-size:11px;margin-top:4px;color:#aab;letter-spacing:1px;}
+  #grenadeCount{font-size:10px;color:#e67e00;letter-spacing:1px;margin-top:2px;}
+  /* Minimap */
+  #minimap{position:fixed;bottom:14px;right:14px;width:140px;height:140px;background:rgba(0,0,0,.75);border:1px solid #334;border-radius:3px;z-index:5;overflow:hidden;}
+  #minimapCanvas{width:140px;height:140px;}
+  /* Motion scanner */
+  #scanner{position:fixed;bottom:14px;left:14px;width:100px;height:100px;background:rgba(0,5,0,.8);border:1px solid #0a3a0a;border-radius:50%;z-index:5;overflow:hidden;display:none;}
+  #scannerCanvas{width:100px;height:100px;}
+  #scannerLabel{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-size:8px;color:#0f0;letter-spacing:2px;}
+  /* Mission panel */
+  #missionPanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.92);color:#cfe8ff;padding:30px 40px;border:1px solid #2ecc71;border-radius:3px;z-index:15;display:none;text-align:center;min-width:360px;}
+  #missionPanel h2{color:#2ecc71;letter-spacing:6px;font-size:16px;margin-top:0;}
+  #missionPanel p{font-size:12px;color:#8899aa;line-height:1.8;}
+  #missionPanel button{margin-top:14px;background:transparent;color:#2ecc71;border:1px solid #2ecc71;padding:8px 22px;font-size:11px;letter-spacing:3px;cursor:pointer;font-family:'Courier New',monospace;}
+  /* Chapter 2 cutscene extra styles */
+  #cutsceneText .green{color:#2ecc71;}
+  #cutsceneText .warn{color:#e74c3c;font-size:16px;}
+  /* Rover indicator */
+  #roverHud{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#2ecc71;font-size:11px;letter-spacing:3px;opacity:0;transition:opacity .3s;z-index:5;pointer-events:none;text-shadow:0 0 8px #2ecc71;}
+  /* Spitter projectile hit */
+  #greenFlash{position:fixed;inset:0;background:#00ff44;opacity:0;pointer-events:none;z-index:8;transition:opacity .06s;}
+  /* Damage */
+  #damageFlash{position:fixed;inset:0;background:#c0392b;opacity:0;pointer-events:none;z-index:8;transition:opacity .08s;}
+  #flashlightTint{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(circle at center,rgba(0,0,0,0) 0%,rgba(0,0,0,.65) 85%);}
+  /* Screens */
+  #startScreen,#deathScreen{position:fixed;inset:0;background:rgba(0,0,0,.95);color:#cfe8ff;display:flex;align-items:center;justify-content:center;z-index:20;text-align:center;}
+  #deathScreen{display:none;}
+  .panel{max-width:560px;padding:34px;}
+  .panel h1{letter-spacing:8px;color:#e74c3c;font-size:30px;margin-bottom:4px;}
+  .panel h2{letter-spacing:4px;color:#556677;font-size:12px;font-weight:normal;margin-top:0;}
+  .panel p{font-size:12px;line-height:1.9;color:#778899;margin:18px 0;}
+  .panel .controls{text-align:left;display:inline-block;font-size:11px;color:#556677;line-height:2.2;border:1px solid #223;padding:12px 20px;}
+  .panel .controls b{color:#9aabbb;}
+  .panel button{margin-top:18px;background:transparent;color:#cfe8ff;border:1px solid #446;padding:11px 28px;font-size:11px;letter-spacing:4px;cursor:pointer;font-family:'Courier New',monospace;}
+  .panel button:hover{background:#0d1a2a;}
+  /* Inventory bar */
+  .invSlot{background:rgba(0,0,0,.7);border:1px solid #334;border-radius:3px;padding:5px 8px;min-width:44px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
+  .invSlot:hover,.invSlot.active{border-color:#2ecc71;background:rgba(0,40,15,.8);}
+  .invSlot.locked{opacity:.35;cursor:default;border-color:#223;}
+  .invSlot.locked:hover{border-color:#223;background:rgba(0,0,0,.7);}
+  .invIcon{font-size:16px;line-height:1.2;}
+  .invKey{font-size:7px;color:#4488aa;letter-spacing:1px;margin-top:1px;}
+  .invLabel{font-size:8px;color:#667788;letter-spacing:1px;}
+  /* Bouncing quest arrow */
+  .questArrow{position:fixed;font-size:22px;color:#ffd966;text-shadow:0 0 12px #ffd966;pointer-events:none;animation:arrowBounce .7s infinite alternate ease-in-out;transform:translateX(-50%);}
+  @keyframes arrowBounce{from{transform:translateX(-50%) translateY(0);}to{transform:translateX(-50%) translateY(-10px);}}
+  /* Shop */
+  .shopItem{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #0f2010;font-size:11px;letter-spacing:1px;}
+  .shopItem .itemName{color:#aabbd0;flex:1;}
+  .shopItem .itemCost{color:#ffd966;width:60px;text-align:right;margin-right:12px;}
+  .shopItem button{background:transparent;color:#2ecc71;border:1px solid #2ecc71;padding:4px 12px;font-size:10px;letter-spacing:2px;cursor:pointer;font-family:'Courier New',monospace;}
+  .shopItem button:hover{background:#0a2010;}
+  .shopItem button:disabled{color:#334;border-color:#223;cursor:default;}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <div class="panel">
+    <h1>ECLIPSE-13</h1>
+    <h2>SALVAGE STATION — LUNA SURFACE — SIGNAL LOST 11 HOURS AGO</h2>
+    <p>Last transmission: <em style="color:#c0392b">"...containment failed. Do NOT send anyone. I repeat—"</em></p>
+    <p>You are the recovery operative. The station is dark.<br>Something got out of the containment lab.</p>
+    <div class="controls">
+      <b>WASD</b> — Move &nbsp;&nbsp;&nbsp; <b>Mouse</b> — Look<br>
+      <b>F</b> — Flashlight &nbsp;&nbsp; <b>Left Click</b> — Shoot<br>
+      <b>E</b> — Interact / Talk to NPCs / Open doors<br>
+      <b>1/2</b> — Switch weapon &nbsp;&nbsp;&nbsp; <b>G</b> — Throw grenade<br>
+      <b>H</b> — Use medkit (from inventory)<br>
+      <span style="color:#445">Objectives top-right &nbsp;|&nbsp; Inventory bottom of HUD</span>
+    </div><br>
+    <button id="startBtn">▶ ENTER STATION</button>
+  </div>
+</div>
+<div id="deathScreen">
+  <div class="panel">
+    <h1>YOU DIED</h1>
+    <p style="color:#a03020">ECLIPSE-13 claims another crew.<br>Something is still moving in the dark.</p>
+    <button onclick="location.reload()">↺ RESTART</button>
+  </div>
+</div>
+<div id="cutscene"><div id="cutsceneText"></div></div>
+<div id="logOverlay">
+  <div class="paper">
+    <div class="dateStamp" id="logDate"></div>
+    <h3 id="logTitle">DOCUMENT</h3>
+    <div class="stamp" id="logStamp">ECLIPSE-13</div>
+    <div class="logbody" id="logBody"></div>
+    <div class="hint">[E] TO CLOSE</div>
+  </div>
+</div>
+
+<div id="minimap"><canvas id="mmCvs" width="140" height="140"></canvas></div>
+<div id="scanner"><canvas id="scCvs" width="100" height="100"></canvas><div id="scannerLabel">MOTION</div></div>
+<div id="missionPanel"><h2 id="missionTitle">MISSION</h2><p id="missionDesc"></p><button id="missionBtn">BEGIN MISSION</button></div>
+<div id="roverHud">[E] EXIT ROVER</div>
+<div id="greenFlash"></div>
+<div id="flashlightTint"></div>
+<div id="damageFlash"></div>
+<div id="crosshair"></div>
+<div id="message"></div>
+<div id="prompt"></div>
+<div id="zoneName"></div>
+<div id="objective"></div>
+<div id="hud">
+  <div class="bar"><div id="healthFill"></div></div>
+  <div id="ammoLine">AMMO: 30</div>
+  <div id="keyLine">
+    <span class="keyIcon keyOff" id="keyRed"></span>RED &nbsp;
+    <span class="keyIcon keyOff" id="keyBlue"></span>BLUE
+  </div>
+  <div id="flashState">FLASHLIGHT: OFF</div>
+  <div id="staminaBar"><div id="staminaFill"></div></div>
+  <div id="weaponLine">WEAPON: PISTOL</div>
+  <div id="grenadeCount"></div>
+  <div id="creditsLine" style="font-size:10px;color:#ffd966;letter-spacing:1px;margin-top:3px;">CREDITS: 0 CR</div>
+  <div id="inventoryBar" style="display:flex;gap:6px;margin-top:8px;">
+    <div class="invSlot active" id="slot1" onclick="window.selectSlot(1)"><div class="invIcon">🔫</div><div class="invKey">1</div><div class="invLabel">PISTOL</div></div>
+    <div class="invSlot locked" id="slot2" onclick="window.selectSlot(2)"><div class="invIcon">⚡</div><div class="invKey">2</div><div class="invLabel">PULSE</div></div>
+    <div class="invSlot" id="slotG"><div class="invIcon">💣</div><div class="invKey">G</div><div class="invLabel" id="grenLabel">×0</div></div>
+    <div class="invSlot" id="slotH"><div class="invIcon">💊</div><div class="invKey">H</div><div class="invLabel" id="medLabel">×0</div></div>
+  </div>
+</div>
+
+<!-- OVERLAYS: shop, npc talk, commander -->
+<div id="shopOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:15;">
+  <div style="max-width:480px;width:90%;background:#080e0a;border:1px solid #2ecc71;border-radius:3px;padding:28px 34px;font-family:'Courier New',monospace;color:#cfe8ff;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h2 style="margin:0;color:#2ecc71;letter-spacing:5px;font-size:15px;">SUPPLY DEPOT</h2>
+      <span id="shopCredits" style="color:#ffd966;font-size:12px;letter-spacing:2px;">0 CR</span>
+    </div>
+    <div id="shopMsg" style="min-height:16px;font-size:10px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px;text-align:center;"></div>
+    <div id="shopItems"></div>
+    <div style="margin-top:20px;border-top:1px solid #1a3a1a;padding-top:14px;display:flex;justify-content:space-between;align-items:center;">
+      <span id="lunarPrompt" style="font-size:9px;color:#556677;letter-spacing:1px;max-width:260px;line-height:1.6;"></span>
+      <button onclick="window.closeShop()" style="background:transparent;color:#667788;border:1px solid #334;padding:7px 18px;font-size:10px;letter-spacing:3px;cursor:pointer;font-family:'Courier New',monospace;">CLOSE [E]</button>
+    </div>
+  </div>
+</div>
+<div id="npcOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:10;">
+  <div style="max-width:420px;width:88%;background:#0a0e12;color:#cfe8ff;padding:28px 32px;border-radius:3px;font-family:'Courier New',monospace;border-left:3px solid #4a8aaa;">
+    <div id="npcName" style="font-size:9px;letter-spacing:4px;color:#4a8aaa;margin-bottom:10px;text-transform:uppercase;"></div>
+    <div id="npcText" style="font-size:13px;line-height:1.9;color:#aabbd0;"></div>
+    <div style="margin-top:16px;font-size:9px;color:#334455;letter-spacing:2px;border-top:1px solid #1a2a3a;padding-top:10px;">[E] TO CLOSE</div>
+  </div>
+</div>
+<div id="commanderOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:12;">
+  <div style="max-width:520px;width:92%;background:#060d0a;border:2px solid #2ecc71;border-radius:3px;font-family:'Courier New',monospace;overflow:hidden;">
+    <div style="background:#0a1a10;padding:14px 22px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #1a3a1a;">
+      <div style="width:44px;height:44px;background:#1a2a1a;border:1px solid #2ecc71;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:22px;">🪖</div>
+      <div><div style="color:#2ecc71;font-size:11px;letter-spacing:4px;">COMMANDER HAYES</div><div style="color:#445;font-size:9px;letter-spacing:2px;margin-top:2px;">ECLIPSE-13 RESCUE COMMAND · CLEARANCE ALPHA</div></div>
+    </div>
+    <div style="padding:20px 22px;">
+      <div id="cmdText" style="font-size:12px;line-height:2;color:#99bbaa;min-height:60px;white-space:pre-line;"></div>
+      <div id="cmdTasks" style="margin-top:14px;"></div>
+    </div>
+    <div style="padding:10px 22px 16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #0d2010;">
+      <div id="cmdStatus" style="font-size:9px;color:#2ecc71;letter-spacing:2px;"></div>
+      <button onclick="window.closeCommander()" style="background:transparent;color:#667788;border:1px solid #334;padding:7px 18px;font-size:10px;letter-spacing:3px;cursor:pointer;font-family:'Courier New',monospace;">CLOSE [E]</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ===== AUDIO ===== */
+let actx=null;
+function audioInit(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();}
+function beep(freq,dur,type,vol,delay){
+  if(!actx)return;
+  type=type||'sine';vol=vol||0.18;delay=delay||0;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type=type;o.frequency.value=freq;g.gain.value=vol;
+  o.connect(g);g.connect(actx.destination);
+  const t=actx.currentTime+delay;
+  o.start(t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.stop(t+dur+0.05);
+}
+const snd={
+  shoot:function(){beep(200,.06,'square',.2);beep(90,.12,'square',.12,.03);},
+  empty:function(){beep(100,.09,'square',.07);},
+  hurt:function(){beep(80,.4,'sawtooth',.28);beep(60,.3,'sawtooth',.15,.05);},
+  pickup:function(){beep(600,.1,'sine',.16);beep(1000,.1,'sine',.12,.07);},
+  door:function(){beep(180,.45,'triangle',.14);beep(250,.35,'triangle',.09,.1);},
+  autoDoor:function(){beep(320,.18,'sine',.07);beep(480,.18,'sine',.05,.07);},
+  locked:function(){beep(90,.22,'square',.1);},
+  hit:function(){beep(1100,.04,'square',.1);},
+  growl:function(){beep(50,.7,'sawtooth',.25);beep(38,.5,'sawtooth',.18,.12);},
+  paper:function(){beep(800,.04,'sine',.06);beep(600,.06,'sine',.04,.03);},
+  win:function(){[0,.2,.4,.6].forEach(function(d,i){beep([400,500,630,800][i],.4,'sine',.14,d);});}
+};
+
+/* ===== SCENE ===== */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x000508);
+scene.fog=new THREE.Fog(0x000000,9,60);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,1000);
+camera.position.set(0,1.75,12);
+camera.rotation.order='YXZ';
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+addEventListener('resize',function(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+scene.add(new THREE.AmbientLight(0x112233,.4));
+const flashlight=new THREE.SpotLight(0xffeedd,7,45,Math.PI/6.5,.38,1.1);
+const flashTarget=new THREE.Object3D();
+flashTarget.position.set(0,0,-1);
+camera.add(flashlight,flashTarget);
+flashlight.target=flashTarget;
+flashlight.visible=false;
+scene.add(camera);
+
+/* ===== MATERIALS ===== */
+const MAT={
+  wall:new THREE.MeshStandardMaterial({color:0x3a3f47,roughness:.9}),
+  wallB:new THREE.MeshStandardMaterial({color:0x262c38,roughness:.9}),
+  floor:new THREE.MeshStandardMaterial({color:0x0f1115,roughness:.95}),
+  desk:new THREE.MeshStandardMaterial({color:0x4a3e30,roughness:.8}),
+  metal:new THREE.MeshStandardMaterial({color:0x3a4050,metalness:.5,roughness:.5}),
+  glass:new THREE.MeshStandardMaterial({color:0x88ccff,transparent:true,opacity:.2,emissive:0x224466,emissiveIntensity:.35}),
+  paper:new THREE.MeshStandardMaterial({color:0xf0e8d4,roughness:.95,side:THREE.DoubleSide}),
+  crate:new THREE.MeshStandardMaterial({color:0x5a3e22,roughness:.9}),
+  locker:new THREE.MeshStandardMaterial({color:0x2e3d4d,metalness:.4,roughness:.6}),
+  screen:new THREE.MeshStandardMaterial({color:0x003322,emissive:0x00cc88,emissiveIntensity:.7}),
+  pipe:new THREE.MeshStandardMaterial({color:0x506070,metalness:.6,roughness:.4}),
+  bed:new THREE.MeshStandardMaterial({color:0x9a9a8a,roughness:.9}),
+  danger:new THREE.MeshStandardMaterial({color:0x220800,emissive:0x441100,emissiveIntensity:.4})
+};
+
+/* ===== WORLD HELPERS ===== */
+const colliders=[];
+const doors=[];
+const pickups=[];
+const aliens=[];
+
+function mkW(x,y,z,w,h,d,mat){
+  mat=mat||MAT.wall;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z);scene.add(m);
+  colliders.push(new THREE.Box3().setFromObject(m));
+  return m;
+}
+function mkB(x,y,z,w,h,d,mat){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat||MAT.wall);
+  m.position.set(x,y,z);scene.add(m);return m;
+}
+function mkC(x,y,z,w,h,d,mat){
+  const m=mkB(x,y,z,w,h,d,mat);
+  colliders.push(new THREE.Box3().setFromObject(m));return m;
+}
+function mkDoor(x,y,z,w,h,d,key,name){
+  var mat;
+  if(key==='red') mat=new THREE.MeshStandardMaterial({color:0x551111,emissive:0x330808,roughness:.6});
+  else if(key==='blue') mat=new THREE.MeshStandardMaterial({color:0x112244,emissive:0x081833,roughness:.6});
+  else if(key==='command') mat=new THREE.MeshStandardMaterial({color:0x2a1a44,emissive:0x150a22,roughness:.6});
+  else mat=new THREE.MeshStandardMaterial({color:0x1a3328,emissive:0x0a2216,roughness:.6});
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z);scene.add(m);
+  const box=new THREE.Box3().setFromObject(m);
+  doors.push({mesh:m,box:box,baseY:y,open:false,opening:false,progress:0,key:key,name:name});
+  return m;
+}
+function ptLight(x,y,z,col,intensity,dist){
+  const l=new THREE.PointLight(col,intensity,dist);l.position.set(x,y,z);scene.add(l);return l;
+}
+
+/* ===== FLOOR ===== */
+const floorMesh=new THREE.Mesh(new THREE.PlaneGeometry(600,600),MAT.floor);
+floorMesh.rotation.x=-Math.PI/2;scene.add(floorMesh);
+
+/* ===== DOCKING BAY z[-20,20] ===== */
+mkW(-12,4,-20,16,8,1);mkW(12,4,-20,16,8,1);
+/* South wall: two flanking panels + airlock door gap in center (±3 units wide) */
+/* Left flank: x -20 to -3 = width 17, centre at -11.5 */
+mkW(-11.5,4,20,17,8,1);
+/* Right flank: x +3 to +20 = width 17, centre at +11.5 */
+mkW(11.5,4,20,17,8,1);
+/* Airlock door frame sides */
+mkW(-3.5,4,20,1,8,1,new THREE.MeshStandardMaterial({color:0x2a4a3a,metalness:.5,roughness:.4}));
+mkW(3.5,4,20,1,8,1,new THREE.MeshStandardMaterial({color:0x2a4a3a,metalness:.5,roughness:.4}));
+/* Airlock door panel — slides up when Ch2 launches. baseY=4 so it fills the 8-tall gap */
+var airlockDoorPanel=new THREE.Mesh(new THREE.BoxGeometry(6,8,0.5),new THREE.MeshStandardMaterial({color:0x2a4a3a,metalness:.5,roughness:.4,emissive:0x0a1f14,emissiveIntensity:.5}));
+airlockDoorPanel.position.set(0,4,20);scene.add(airlockDoorPanel);
+/* Warning stripe across the door */
+var airlockStripe=new THREE.Mesh(new THREE.BoxGeometry(6,.35,.6),new THREE.MeshStandardMaterial({color:0xffaa00,emissive:0xaa6600,emissiveIntensity:.6}));
+airlockStripe.position.set(0,1.2,20);scene.add(airlockStripe);
+/* Ventilation slots */
+[-1.5,0,1.5].forEach(function(sx){
+  var slot=new THREE.Mesh(new THREE.BoxGeometry(.08,.8,.55),new THREE.MeshStandardMaterial({color:0x111,roughness:1}));
+  slot.position.set(sx,3.5,20);scene.add(slot);
+});
+var airlockDoorCollider=new THREE.Box3().setFromObject(airlockDoorPanel);
+colliders.push(airlockDoorCollider);
+/* Door status lights — red = locked */
+var airlockStatusLight=new THREE.PointLight(0xff2200,1.2,8);airlockStatusLight.position.set(0,7.5,19.5);scene.add(airlockStatusLight);
+/* Reference for removal in startChapter2 */
+var southWall=null; /* no longer a single wall — handled by airlockDoorPanel */
+mkW(-20,4,0,1,8,40);mkW(20,4,0,1,8,40);
+mkB(0,8,0,40,.3,40,MAT.wall);
+/* floor grid lines */
+for(var gi=-18;gi<=18;gi+=6){
+  mkB(gi,.01,0,.05,.02,40,new THREE.MeshStandardMaterial({color:0x223344,emissive:0x223344,emissiveIntensity:.5}));
+  mkB(0,.01,gi,40,.02,.05,new THREE.MeshStandardMaterial({color:0x223344,emissive:0x223344,emissiveIntensity:.5}));
+}
+/* Crates */
+for(var ci=0;ci<6;ci++){
+  mkC(-12+ci*4,1.2,16,2.4,2.4,2.4,MAT.crate);
+  if(ci%2===0) mkC(-12+ci*4,3.6,16,2.4,1.2,2.4,MAT.crate);
+}
+mkC(-17,1.5,5,2,3,4,MAT.metal);mkC(-17,1.5,-5,2,3,4,MAT.metal);
+/* Control desk */
+mkC(15,1,0,4,1,2,MAT.desk);
+mkB(15,1.6,0,3.6,.1,1.8,new THREE.MeshStandardMaterial({color:0x222}));
+mkC(13,1,-1.5,.6,2,.4,MAT.locker);
+mkC(16,1,-1.5,.6,2,.4,MAT.screen);
+
+/* ===== CORRIDOR z[-40,-20] ===== */
+mkW(-6,4,-30,1,8,20);mkW(6,4,-30,1,8,20);
+mkB(0,8,-30,12,.3,20,MAT.wall);
+for(var pi=0;pi<4;pi++){
+  var pipe=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,11,8),MAT.pipe);
+  pipe.rotation.z=Math.PI/2;pipe.position.set(0,7.5,-23-pi*5);scene.add(pipe);
+}
+mkDoor(0,4,-40,12,8,1,'red','CHECKPOINT ACCESS');
+
+/* ===== SECURITY CHECKPOINT z[-70,-40] ===== */
+mkW(-10.5,4,-40,9,8,1);mkW(10.5,4,-40,9,8,1);
+mkW(-15,4,-55,1,8,30);
+mkW(15,4,-65,1,8,10);
+mkDoor(15,4,-55,1,8,10,null,'HYDROPONICS');
+mkW(15,4,-45,1,8,10);
+mkW(-10.5,4,-70,9,8,1);mkW(10.5,4,-70,9,8,1);
+mkB(0,8,-55,30,.3,30,MAT.wall);
+mkDoor(0,4,-70,12,8,1,null,'HUB ACCESS');
+/* Desks */
+mkC(-10,1,-48,5,1,2,MAT.desk);mkC(-10,1,-60,5,1,2,MAT.desk);mkC(10,1,-52,5,1,2,MAT.desk);
+/* Lockers */
+for(var li=0;li<7;li++) mkC(-14,1.5,-44-li*4,1,3,1.8,MAT.locker);
+
+/* ===== HYDROPONICS z[-65,-40] x[15,40] ===== */
+mkW(27.5,4,-40,25,8,1);mkW(27.5,4,-65,25,8,1);mkW(40,4,-52.5,1,8,25);
+mkB(27.5,8,-52.5,25,.3,25,MAT.wallB);
+[22,28,34].forEach(function(px){
+  var pot=new THREE.Mesh(new THREE.CylinderGeometry(.35,.45,.55,8),new THREE.MeshStandardMaterial({color:0x3d3020,roughness:.9}));
+  pot.position.set(px,.28,-59);scene.add(pot);
+  var stalk=new THREE.Mesh(new THREE.CylinderGeometry(.08,.11,2,6),new THREE.MeshStandardMaterial({color:0x1a2e0e,roughness:.95}));
+  stalk.position.set(px,1.3,-59);stalk.rotation.z=(Math.random()-.5)*.5;scene.add(stalk);
+  var leaf=new THREE.Mesh(new THREE.ConeGeometry(.85,1.6,5),new THREE.MeshStandardMaterial({color:0x1a3d15,emissive:0x072205,roughness:.95}));
+  leaf.position.set(px,2.6,-59);leaf.rotation.z=(Math.random()-.5)*.7;scene.add(leaf);
+});
+ptLight(27.5,5,-52.5,0x00ff44,.6,14);  /* supplemental — main in lighting block */
+mkC(22,1,-44,5,1,1.5,MAT.desk);mkC(35,1,-44,5,1,1.5,MAT.desk);
+
+/* ===== MAIN HUB z[-105,-70] ===== */
+mkW(-18,4,-70,24,8,1);mkW(18,4,-70,24,8,1);
+mkW(-30,4,-100,1,8,10);mkW(-30,4,-77.5,1,8,15);
+mkW(30,4,-100,1,8,10);mkW(30,4,-77.5,1,8,15);
+mkW(-19,4,-105,22,8,1);mkW(19,4,-105,22,8,1);
+mkB(0,8,-87.5,60,.3,35,MAT.wall);
+/* Holographic map */
+var hubMap=new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.2,.12,28),new THREE.MeshStandardMaterial({color:0x0a2233,emissive:0x22aadd,emissiveIntensity:1.6,transparent:true,opacity:.5}));
+hubMap.position.set(0,1.1,-87.5);scene.add(hubMap);
+colliders.push(new THREE.Box3().setFromObject(hubMap));
+/* Window to moon */
+mkB(-29.5,4,-87.5,.18,4,10,MAT.glass);
+/* Hub benches */
+mkC(-22,1,-80,4,.8,2,MAT.desk);mkC(22,1,-80,4,.8,2,MAT.desk);
+mkC(-22,1,-95,4,.8,2,MAT.desk);mkC(22,1,-95,4,.8,2,MAT.desk);
+mkDoor(-30,4,-90,1,8,10,null,'LAB WING ACCESS');
+mkDoor(30,4,-90,1,8,10,null,'MED WING ACCESS');
+
+/* ===== MOON EXTERIOR ===== */
+(function(){
+  var moonSurface=new THREE.Mesh(new THREE.PlaneGeometry(100,80),new THREE.MeshStandardMaterial({color:0x18191d,roughness:1}));
+  moonSurface.rotation.x=-Math.PI/2;moonSurface.position.set(-70,0,-87.5);scene.add(moonSurface);
+  [[-60,-80,-6],[-80,-90,-5],[-65,-70,-4],[-92,-80,-7]].forEach(function(c){
+    var crater=new THREE.Mesh(new THREE.CylinderGeometry(c[2]*-1,c[2]*-.8,.3,16),new THREE.MeshStandardMaterial({color:0x111315,roughness:1}));
+    crater.position.set(c[0],.01,c[1]);scene.add(crater);
+  });
+  /* Earth */
+  var earth=new THREE.Mesh(new THREE.SphereGeometry(5,20,20),new THREE.MeshStandardMaterial({color:0x1a4a8a,emissive:0x0a2244,roughness:.9,emissiveIntensity:.3}));
+  earth.position.set(-90,35,-80);scene.add(earth);
+  [[0,6,2],[3,-5,4],[-4,2,-3]].forEach(function(c){
+    var cloud=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,10),new THREE.MeshStandardMaterial({color:0xddeeff,roughness:1,transparent:true,opacity:.5}));
+    cloud.position.set(-90+c[0],35+c[1],-80+c[2]);scene.add(cloud);
+  });
+  var sun=new THREE.DirectionalLight(0xffeedd,.4);sun.position.set(-200,100,-100);scene.add(sun);
+  for(var si=0;si<300;si++){
+    var star=new THREE.Mesh(new THREE.SphereGeometry(.08,4,4),new THREE.MeshBasicMaterial({color:0xeeeeff}));
+    star.position.set(-50+Math.random()*-80,5+Math.random()*50,-60+Math.random()*-60);scene.add(star);
+  }
+})();
+
+/* ===== LAB WING x[-70,-30] z[-105,-75] ===== */
+mkW(-37.5,4,-85,15,8,1);mkW(-37.5,4,-95,15,8,1);
+mkW(-57.5,4,-75,25,8,1);mkW(-57.5,4,-105,25,8,1);
+mkW(-70,4,-90,1,8,30);mkW(-45,4,-80,1,8,10);mkW(-45,4,-100,1,8,10);
+mkB(-57.5,8,-90,25,.3,30,MAT.wallB);
+/* Lab desks */
+mkC(-65,1,-80,6,1,2,MAT.desk);mkC(-65,1,-90,6,1,2,MAT.desk);mkC(-65,1,-100,6,1,2,MAT.desk);
+mkC(-50,1,-80,4,1,1.5,MAT.desk);mkC(-50,1,-98,4,1,1.5,MAT.desk);
+mkB(-68,2.5,-80,.12,2,1.4,MAT.screen);mkB(-68,2.5,-90,.12,2,1.4,MAT.screen);
+/* Specimen tanks */
+[-83,-90,-97].forEach(function(tz){
+  var tank=new THREE.Mesh(new THREE.BoxGeometry(1.4,2.8,1.4),new THREE.MeshStandardMaterial({color:0x003322,emissive:0x00aa44,emissiveIntensity:.4,transparent:true,opacity:.55}));
+  tank.position.set(-48,1.4,tz);scene.add(tank);
+  colliders.push(new THREE.Box3().setFromObject(tank));
+});
+
+/* ===== MED WING x[30,70] z[-105,-75] ===== */
+mkW(37.5,4,-85,15,8,1);mkW(37.5,4,-95,15,8,1);
+mkW(57.5,4,-75,25,8,1);mkW(57.5,4,-105,25,8,1);
+mkW(70,4,-90,1,8,30);mkW(45,4,-80,1,8,10);mkW(45,4,-100,1,8,10);
+mkB(57.5,8,-90,25,.3,30,MAT.wallB);
+[[50,-80],[60,-80],[50,-98],[60,-98]].forEach(function(b){
+  mkC(b[0],.5,b[1],2.5,1,5.5,MAT.metal);
+  mkB(b[0],1.08,b[1]-2,2.2,.15,1.2,MAT.bed);
+});
+[48,55,63].forEach(function(lx){mkC(lx,1.5,-103,1.5,3,.6,MAT.locker);});
+/* Med wing main light now in global lighting block */
+
+/* ===== REACTOR CORRIDOR z[-125,-105] ===== */
+mkW(-8,4,-115,1,8,20);mkW(8,4,-115,1,8,20);
+mkB(0,8,-115,16,.3,20,MAT.wall);
+for(var di=0;di<6;di++) mkB(0,.02,-107-di*3,16,.02,1.5,MAT.danger);
+mkDoor(0,4,-125,16,8,1,'blue','REACTOR ACCESS');
+mkW(-8.5,4,-125,1,8,1);mkW(8.5,4,-125,1,8,1);
+
+/* ===== REACTOR CORE z[-165,-125] ===== */
+mkW(-16.5,4,-125,17,8,1);mkW(16.5,4,-125,17,8,1);
+mkW(0,4,-165,50,8,1);mkW(-25,4,-145,1,8,40);mkW(25,4,-145,1,8,40);
+mkB(0,8,-145,50,.3,40,MAT.wall);
+var reactor=new THREE.Mesh(new THREE.CylinderGeometry(4.5,4.5,12,24),new THREE.MeshStandardMaterial({color:0x1a2a1a,emissive:0xff6600,emissiveIntensity:.6,roughness:.5}));
+reactor.position.set(0,6,-155);scene.add(reactor);
+colliders.push(new THREE.Box3().setFromObject(reactor));
+[[-18,-130],[18,-130],[-18,-160],[18,-160]].forEach(function(p){
+  mkC(p[0],3,-133,1.5,8,1.5,new THREE.MeshStandardMaterial({color:0x221100,emissive:0xff2200,emissiveIntensity:.3}));
+});
+
+/* ===== LIGHTING — atmospheric per-zone ===== */
+/* Corridor emergency flicker lights (red, on the ceiling strip) */
+[-25,-115].forEach(function(z){
+  var l=new THREE.PointLight(0xff2200,5,16);l.position.set(0,7,z);scene.add(l);l.userData.flicker=Math.random()*10;
+});
+var corridorLights=scene.children.filter(function(o){return o.userData&&o.userData.flicker!==undefined;});
+
+/* Docking Bay — cool industrial blue-white overhead panels (merged) */
+ptLight(0,7,5,0x8899cc,2.8,40);
+ptLight(0,7,-3,0x9aa8cc,1.8,28);
+ptLight(16,3,-1.5,0x00ff99,.8,8);     // desk screen glow
+
+/* Transit Corridor — dim single strip, industrial */
+ptLight(0,7,-30,0x445566,1.6,30);
+
+/* Security Checkpoint — cool teal (merged) */
+ptLight(0,6,-52,0x226688,2,32);
+ptLight(0,6,-62,0x1a5577,1.3,18);
+
+/* Hydroponics — warm grow-light green (merged) */
+ptLight(27.5,5,-52.5,0x00ff44,1.6,28);
+ptLight(28,2,-60,0x22aa44,.6,12);     // plant glow
+
+/* Main Hub — holographic blue + ambient warm (merged) */
+var hubLight=ptLight(0,2.5,-87.5,0x22aadd,3,22);
+ptLight(0,7,-87.5,0x334466,1.8,34);
+/* Window moonlight spill */
+ptLight(-32,4,-87.5,0xbbccee,.6,22);
+
+/* Lab Wing — cold blue science light (merged) */
+ptLight(-57,5,-90,0x0055aa,1.2,26);
+ptLight(-48,3,-90,0x00ff66,.8,16);   // tank glow (covers all 3 tanks)
+
+/* Med Wing — clinical white-cool (merged) */
+ptLight(57,5,-90,0xaaaaff,1.1,26);
+
+/* Reactor Corridor — orange-red danger */
+ptLight(0,6,-115,0xaa3300,2.2,24);
+
+/* Reactor Core — dramatic orange reactor glow (merged) */
+var reactorGlow=ptLight(0,7,-155,0xff8800,6,55);
+ptLight(0,4,-140,0xff5500,2.5,28);
+[[-18,-130],[18,-130],[-18,-160],[18,-160]].forEach(function(p){
+  ptLight(p[0],4,p[1],0xff2200,1.3,10);
+});
+
+/* ===== GUN VM ===== */
+var gun=new THREE.Group();
+var gb=new THREE.Mesh(new THREE.BoxGeometry(.17,.14,.55),new THREE.MeshStandardMaterial({color:0x1a1a1e,metalness:.7,roughness:.3}));
+var gbar=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.38,8),new THREE.MeshStandardMaterial({color:0x0d0d10,metalness:.8}));
+gbar.rotation.x=Math.PI/2;gbar.position.set(0,.02,-.42);
+gun.add(gb,gbar);gun.position.set(.3,-.26,-.58);camera.add(gun);
+
+/* ===== PICKUPS ===== */
+function addOrb(x,y,z,color,type,extra){
+  var mat,geo;
+  if(type==='log'){geo=new THREE.PlaneGeometry(.7,.9);mat=MAT.paper;}
+  else if(type==='health'){geo=new THREE.BoxGeometry(.4,.4,.4);mat=new THREE.MeshStandardMaterial({color:color,emissive:color,emissiveIntensity:1.3});}
+  else{geo=new THREE.IcosahedronGeometry(.32,1);mat=new THREE.MeshStandardMaterial({color:color,emissive:color,emissiveIntensity:1.3});}
+  var mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(x,y,z);
+  if(type==='log'){mesh.rotation.x=-Math.PI/2;mesh.rotation.z=(Math.random()-.5)*.35;}
+  var lc=new THREE.PointLight(type==='log'?0xffd966:color,1.2,5);
+  mesh.add(lc);scene.add(mesh);
+  var obj=Object.assign({mesh:mesh,type:type,range:type==='log'?1.9:1.5},extra||{});
+  pickups.push(obj);
+}
+
+/* Keys */
+addOrb(-10,1.1,8,0xe74c3c,'key',{key:'red'});
+addOrb(-60,1.1,-90,0x3498db,'key',{key:'blue'});
+/* Ammo */
+addOrb(-10,1.1,-55,0x2ecc71,'ammo',{value:15});
+addOrb(60,1.1,-80,0x2ecc71,'ammo',{value:15});
+addOrb(0,1.1,-115,0x2ecc71,'ammo',{value:10});
+addOrb(20,1.1,-58,0x2ecc71,'ammo',{value:12});
+/* Health */
+addOrb(50,1.1,-95,0xff6666,'health',{});
+addOrb(30,1.1,-44,0xff6666,'health',{});
+
+/* Paper logs on desks */
+var LOGS=[
+  {x:15,y:1.52,z:-.5,title:"CAPTAIN'S LOG — DAY 41",date:"CYCLE 41-A",stamp:"CLASSIFIED",
+   text:"Routine deep survey below the mare surface.\n\nSurvey drone returned with crystalline fragment samples — non-terrestrial structure. Team is calling it E-13. Science team is excited.\n\nI am not excited.\n\nI've ordered it sealed in the lower bay pending authorization from Earth Control.\n\nControl has not responded in six hours."},
+  {x:-10,y:1.52,z:-48.5,title:"SECURITY LOG — CHECKPOINT B",date:"CYCLE 44-C",stamp:"URGENT",
+   text:"Containment breach confirmed at 02:14 station time.\n\nDr. Anh triggered the emergency seal but E-13 was already outside before the doors could engage. It didn't break out. It waited.\n\nWhatever it is — it studies us. It knew exactly when we were watching and when we weren't.\n\nI've locked the red door. Keycard is in the bay office. If you're reading this: keep moving. Don't stop."},
+  {x:-65,y:1.52,z:-80.5,title:"RESEARCH LOG — SPECIMEN E-13",date:"CYCLE 44-E",stamp:"EYES ONLY",
+   text:"It doesn't eat. It doesn't sleep.\n\nThermal camera: no heat signature. Motion sensor: it is right here in this room.\n\nThe growth pattern suggests E-13 was not alone when we found it. The crystal fragment we recovered was a seed. The moon surface beneath this station is the colony.\n\nWe didn't discover E-13.\n\nWe woke it up."},
+  {x:60,y:1.52,z:-100.5,title:"MEDICAL LOG — QUARANTINE",date:"CYCLE 45-A",stamp:"CONFIDENTIAL",
+   text:"Three crew brought in from sub-level 2.\n\nCold skin. No pulse. Still walking.\n\nNo wounds. No fever. Eyes tracking normally.\n\nI locked them in the isolation ward. Then I heard scratching inside the sealed lockers behind me.\n\nI should not have turned my back.\n\nI will not be filing further reports."},
+  {x:22,y:1.52,z:-44.5,title:"HYDROPONICS LOG — MUTATION",date:"CYCLE 43-F",stamp:"",
+   text:"The root systems are moving.\n\nNot growing — moving. Reaching toward the water pipes. Wrapping around sensors.\n\nSomething in the water supply has reprogrammed them at a cellular level. The plants were the first thing E-13 infected. By the time we noticed, the entire irrigation network was already compromised.\n\nDon't drink the water."},
+  {x:0,y:1.52,z:-114.5,title:"FINAL WARNING — REACTOR OPS",date:"CYCLE 45-B",stamp:"DANGER",
+   text:"If you're reading this you are ten metres from BIOMASS PRIME.\n\nSpecimen E-13 has been absorbing reactor output for hours — using the energy to accelerate growth. The mass behind the blue door is no longer what we originally contained.\n\nAim for the exposed orange core sections. It has three phases. Do not stop shooting when it changes form.\n\nGood luck.\n\nYou'll need it."},
+];
+LOGS.forEach(function(l){addOrb(l.x,l.y,l.z,0xf0e8d4,'log',l);});
+
+/* ===== ALIENS ===== */
+function mkAlien(scale,color,eyeCol){
+  scale=scale||1;color=color||0x2a3a2a;eyeCol=eyeCol||0xff3333;
+  var g=new THREE.Group();
+  var body=new THREE.Mesh(new THREE.CapsuleGeometry(.45*scale,1.5*scale,4,8),new THREE.MeshStandardMaterial({color:color,roughness:.65}));
+  body.position.y=scale;g.add(body);
+  [-1,1].forEach(function(s){
+    var eye=new THREE.Mesh(new THREE.SphereGeometry(.07*scale,6,6),new THREE.MeshStandardMaterial({color:eyeCol,emissive:eyeCol,emissiveIntensity:2.2}));
+    eye.position.set(.16*scale*s,1.55*scale,.42*scale);g.add(eye);
+  });
+  return g;
+}
+function spawnAlien(x,z,opts){
+  var group=mkAlien(opts.scale,opts.color,opts.eyeColor);
+  group.position.set(x,0,z);scene.add(group);
+  var a={group:group,health:opts.health,maxHealth:opts.health,speed:opts.speed,detectRange:opts.detect,attackRange:opts.attack,damage:opts.damage,lastAttack:0,isBoss:!!opts.isBoss,name:opts.name,awake:false,phase2:false,phase3:false};
+  group.userData.alienRef=a;aliens.push(a);return a;
+}
+spawnAlien(-60,-100,{health:35,speed:2.5,detect:14,attack:1.8,damage:8,scale:1,color:0x2a3a2a,eyeColor:0xff3333,name:'Creature Alpha'});
+spawnAlien(30,-90,{health:30,speed:2.8,detect:12,attack:1.7,damage:7,scale:.9,color:0x1a3020,eyeColor:0x33ff33,name:'Med Drone'});
+spawnAlien(0,-140,{health:120,speed:1.7,detect:32,attack:2.8,damage:18,scale:2.4,color:0x2a0a2a,eyeColor:0xff8800,isBoss:true,name:'BIOMASS PRIME'});
+var stalker=mkAlien(1.5,0x0a0a0a,0xffffff);
+stalker.position.set(24,0,-90);scene.add(stalker);
+var stalkerVisible=true,stalkerNoticed=false;
+
+/* ===== INPUT ===== */
+var keys={};
+addEventListener('keydown',function(e){
+  keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==='f') toggleFlash();
+  if(e.key.toLowerCase()==='e') interact();
+});
+addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;});
+var pointerLocked=false;
+document.body.addEventListener('click',function(){
+  if(!game.started||game.over||game.won||logOpen) return;
+  if(!pointerLocked){var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});}
+  shoot();
+});
+document.addEventListener('pointerlockchange',function(){pointerLocked=document.pointerLockElement===document.body;});
+var dragging=false,lastMX=0,lastMY=0;
+document.addEventListener('mousedown',function(e){dragging=true;lastMX=e.clientX;lastMY=e.clientY;});
+document.addEventListener('mouseup',function(){dragging=false;});
+var yaw=0,pitch=0;
+document.addEventListener('mousemove',function(e){
+  if(pointerLocked){yaw-=e.movementX*.0022;pitch=Math.max(-1.3,Math.min(1.3,pitch-e.movementY*.0022));}
+  else if(dragging){yaw-=(e.clientX-lastMX)*.0035;pitch=Math.max(-1.3,Math.min(1.3,pitch-(e.clientY-lastMY)*.0035));lastMX=e.clientX;lastMY=e.clientY;}
+  else return;
+  camera.rotation.y=yaw;camera.rotation.x=pitch;
+});
+
+/* ===== GAME STATE — all vars declared here so updateHud never hits undefined ===== */
+var game={started:false,over:false,won:false,health:100,ammo:30,keys:{red:false,blue:false,command:false},powerFailed:false,credits:0,maxHealth:100};
+var logOpen=false,powerFailTriggered=false;
+/* Restoration state — declared early so updateHud can read them safely */
+/* ch15 state declared below */
+var cmdTasksDone={power:false,armed:false};
+var inventory={medkits:0,pulseOwned:false};
+var shopBought={pulseBought:false,armourBought:false};
+var nearLog=null,nearDoor=null,nearNpc=null,nearShop=false;
+var npcs=[],commander=null,commanderSoldiers=[],commanderArrow=null;
+function toggleFlash(){flashlight.visible=!flashlight.visible;document.getElementById('flashState').textContent='FLASHLIGHT: '+(flashlight.visible?'ON':'OFF');}
+
+/* ===== HUD ===== */
+var healthFill=document.getElementById('healthFill');
+var ammoEl=document.getElementById('ammoLine');
+var keyRedEl=document.getElementById('keyRed');
+var keyBlueEl=document.getElementById('keyBlue');
+var msgEl=document.getElementById('message');
+var promptEl=document.getElementById('prompt');
+var flashDiv=document.getElementById('damageFlash');
+var objEl=document.getElementById('objective');
+var zoneEl=document.getElementById('zoneName');
+var msgTimer=null;
+function showMsg(txt,ms){
+  ms=ms||2400;msgEl.textContent=txt;msgEl.style.opacity=1;
+  clearTimeout(msgTimer);msgTimer=setTimeout(function(){msgEl.style.opacity=0;},ms);
+}
+function flashRed(){flashDiv.style.background='#c0392b';flashDiv.style.opacity=.5;setTimeout(function(){flashDiv.style.opacity=0;},130);}
+function flashOrange(){flashDiv.style.background='#e67e00';flashDiv.style.opacity=.4;setTimeout(function(){flashDiv.style.opacity=0;setTimeout(function(){flashDiv.style.background='#c0392b';},200);},450);}
+function updateHud(){
+  healthFill.style.width=Math.max(0,game.health)+'%';
+  healthFill.style.background=game.health>50?'linear-gradient(90deg,#7b0000,#c0392b)':game.health>25?'linear-gradient(90deg,#7a5500,#e67e00)':'linear-gradient(90deg,#500,#f00)';
+  ammoEl.textContent='AMMO: '+game.ammo;
+  keyRedEl.className='keyIcon '+(game.keys.red?'keyOn red':'keyOff');
+  keyBlueEl.className='keyIcon '+(game.keys.blue?'keyOn blue':'keyOff');
+  document.getElementById('creditsLine').textContent='CREDITS: '+game.credits+' CR';
+  var c=function(done){return '<span style="color:'+(done?'#2ecc71':'#334')+'">'+(done?'✔':'○')+'</span>';};
+  if(ch15.active){
+    if(ch15.timerRunning){
+      var secs=Math.max(0,Math.ceil(ch15.timerLeft));
+      var mm=Math.floor(secs/60),ss=secs%60;
+      var tcolor=secs<30?'#e74c3c':secs<60?'#ffd966':'#2ecc71';
+      objEl.innerHTML='<span style="color:'+tcolor+';font-size:13px;letter-spacing:2px;">⏱ '+mm+':'+(ss<10?'0':'')+ss+'</span><br>'+
+        c(ch15.commsRestored)+' REACH COMMUNICATIONS TERMINAL<br>'+
+        c(ch15.aliensCleared)+' CLEAR ALL CONTACTS<br>'+
+        c(ch15.commsRestored&&ch15.aliensCleared)+' ESCAPE BEFORE LOCKDOWN';
+    } else {
+      objEl.innerHTML=c(ch15.hasKeycard)+' GET COMMAND KEYCARD FROM HAYES<br>'+
+        c(ch15.wingUnlocked)+' ACCESS COMMUNICATIONS WING<br>'+
+        c(ch15.timerStarted)+' TRIGGER BLAST DOOR OVERRIDE<br>'+
+        c(ch15.commsRestored)+' RESTORE COMMUNICATIONS';
+    }
+  } else {
+    var reactorOpen=doors.some(function(d){return d.key==='blue'&&d.open;});
+    objEl.innerHTML=c(game.keys.red)+' FIND RED KEYCARD<br>'+c(game.keys.blue)+' FIND BLUE KEYCARD<br>'+c(reactorOpen)+' ENTER REACTOR CORE<br>'+c(game.won)+' DESTROY BIOMASS PRIME';
+  }
+  updateInventoryHud();
+}
+
+/* ===== ZONE ===== */
+var ZONES=[
+  {name:'DOCKING BAY',xmin:-20,xmax:20,zmin:-20,zmax:20},
+  {name:'TRANSIT CORRIDOR',xmin:-6,xmax:6,zmin:-40,zmax:-20},
+  {name:'SECURITY CHECKPOINT',xmin:-15,xmax:15,zmin:-70,zmax:-40},
+  {name:'HYDROPONICS WING',xmin:15,xmax:40,zmin:-65,zmax:-40},
+  {name:'MAIN HUB',xmin:-30,xmax:30,zmin:-105,zmax:-70},
+  {name:'LABORATORY WING',xmin:-70,xmax:-30,zmin:-105,zmax:-75},
+  {name:'MEDICAL WING',xmin:30,xmax:70,zmin:-105,zmax:-75},
+  {name:'REACTOR CORRIDOR',xmin:-8,xmax:8,zmin:-125,zmax:-105},
+  {name:'REACTOR CORE — BIOMASS CONTAINMENT',xmin:-25,xmax:25,zmin:-165,zmax:-125},
+];
+var lastZone='';
+function updateZone(){
+  var px=camera.position.x,pz=camera.position.z,found='ECLIPSE-13';
+  for(var zi=0;zi<ZONES.length;zi++){var z=ZONES[zi];if(px>=z.xmin&&px<=z.xmax&&pz>=z.zmin&&pz<=z.zmax){found=z.name;break;}}
+  if(found!==lastZone){
+    lastZone=found;
+    zoneEl.textContent=found;zoneEl.style.opacity=1;
+    clearTimeout(zoneEl._t);zoneEl._t=setTimeout(function(){zoneEl.style.opacity=0;},2600);
+    if(found==='REACTOR CORRIDOR'&&!powerFailTriggered){
+      powerFailTriggered=true;game.powerFailed=true;
+      setTimeout(function(){showMsg('\u26a0  CRITICAL POWER FAILURE',5000);},400);
+      scene.traverse(function(obj){if(obj.isPointLight&&!corridorLights.includes(obj)&&obj!==reactorGlow)obj.intensity*=.12;});
+      corridorLights.forEach(function(l){l.intensity=12;});
+      setTimeout(function(){snd.growl();},900);
+    }
+  }
+}
+
+/* ===== LOG ===== */
+var logOverlay=document.getElementById('logOverlay');
+function openLog(p){
+  logOpen=true;
+  document.getElementById('logTitle').textContent=p.title||'DOCUMENT';
+  document.getElementById('logDate').textContent=p.date||'';
+  document.getElementById('logStamp').textContent=p.stamp||'ECLIPSE-13';
+  document.getElementById('logBody').textContent=p.text||'';
+  logOverlay.style.display='flex';
+  document.exitPointerLock();snd.paper();
+  if(!p._credited){p._credited=true;game.credits+=5;showMsg('+5 CR (DOCUMENT FOUND)');}
+}
+function closeLog(){logOpen=false;logOverlay.style.display='none';}
+function closeAnyOverlay(){
+  var no=document.getElementById('npcOverlay');
+  var co=document.getElementById('commanderOverlay');
+  var so=document.getElementById('shopOverlay');
+  if(no.style.display==='flex'){no.style.display='none';logOpen=false;var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});return true;}
+  if(co.style.display==='flex'){co.style.display='none';logOpen=false;var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});return true;}
+  if(so.style.display==='flex'){so.style.display='none';logOpen=false;var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});return true;}
+  return false;
+}
+function interact(){
+  if(logOpen){closeLog();closeAnyOverlay();return;}
+  if(closeAnyOverlay())return;
+  if(nearLog){openLog(nearLog);scene.remove(nearLog.mesh);pickups.splice(pickups.indexOf(nearLog),1);nearLog=null;return;}
+  if(nearDoor&&!nearDoor.open){
+    if(nearDoor.key==='command'){if(game.keys.command){nearDoor.opening=true;snd.door();showMsg('COMMUNICATIONS WING — UNLOCKED');ch15.wingUnlocked=true;}else{snd.locked();showMsg('LOCKED — COMMAND KEYCARD REQUIRED');}return;}
+    if(game.keys[nearDoor.key]){nearDoor.opening=true;snd.door();showMsg(nearDoor.name+' UNLOCKED');}
+    else{snd.locked();showMsg('LOCKED \u2014 '+nearDoor.key.toUpperCase()+' KEYCARD REQUIRED');}
+  }
+}
+
+/* ===== COLLISION ===== */
+function blocked(x,z){
+  var r=.52;
+  for(var i=0;i<colliders.length;i++){var b=colliders[i];if(x>b.min.x-r&&x<b.max.x+r&&z>b.min.z-r&&z<b.max.z+r)return true;}
+  for(var di=0;di<doors.length;di++){if(doors[di].open)continue;var b=doors[di].box;if(x>b.min.x-r&&x<b.max.x+r&&z>b.min.z-r&&z<b.max.z+r)return true;}
+  return false;
+}
+function movePlayer(dx,dz){
+  var nx=camera.position.x+dx,nz=camera.position.z+dz;
+  if(!blocked(nx,camera.position.z))camera.position.x=nx;
+  if(!blocked(camera.position.x,nz))camera.position.z=nz;
+}
+
+/* ===== SHOOT ===== */
+var raycaster=new THREE.Raycaster();
+var screenShake=0;
+
+/* Muzzle flash light — shared, reused */
+var muzzleLight=new THREE.PointLight(0xffcc44,0,6);
+camera.add(muzzleLight);
+muzzleLight.position.set(0,-.15,-.9);
+
+/* Pulse bolt light — green burst */
+var pulseLight=new THREE.PointLight(0x00ff88,0,10);
+camera.add(pulseLight);
+pulseLight.position.set(0,-.1,-1.1);
+
+/* Bullet spark — tiny mesh that flies forward */
+var sparkGeo=new THREE.SphereGeometry(.04,4,4);
+var sparkMat=new THREE.MeshBasicMaterial({color:0xffee88,transparent:true});
+/* Pulse bolt mesh */
+var boltGeo=new THREE.CylinderGeometry(.025,.025,.6,6);
+var boltMat=new THREE.MeshBasicMaterial({color:0x00ff88});
+/* Debris particle (shared geometry/material — reused, never disposed) */
+var debrisGeo=new THREE.SphereGeometry(.03,3,3);
+
+/* ===== FRAME-DRIVEN PARTICLE SYSTEM =====
+   Replaces setInterval-based effects. All particles update once per
+   render frame via updateEffects(dt), called from animate(). This
+   avoids stacking timers during rapid fire and guarantees disposal. */
+var activeBolts=[];   // {mesh,dir,t,light}
+var activeSparks=[];  // {mesh,dir,t}
+var activeDebris=[];  // {mesh,vel,t,col}
+var tempLights=[];    // {light,until} — short-lived point lights (muzzle glow, impacts)
+
+function addTempLight(light,ms){
+  scene.add(light);
+  tempLights.push({light:light,until:performance.now()+ms});
+}
+function updateEffects(dt){
+  var now=performance.now();
+  /* Temp lights */
+  for(var i=tempLights.length-1;i>=0;i--){
+    if(now>=tempLights[i].until){scene.remove(tempLights[i].light);tempLights.splice(i,1);}
+  }
+  /* Bolts */
+  for(var i=activeBolts.length-1;i>=0;i--){
+    var b=activeBolts[i];b.t+=dt*3.75;
+    b.mesh.position.addScaledVector(b.dir,2.2*(dt*16));
+    b.mesh.scale.y=Math.max(.1,1-b.t*.5);
+    if(b.t>1){scene.remove(b.mesh);b.mesh.material.dispose();activeBolts.splice(i,1);}
+  }
+  /* Sparks */
+  for(var i=activeSparks.length-1;i>=0;i--){
+    var s=activeSparks[i];s.t+=dt*3.1;
+    s.mesh.position.addScaledVector(s.dir,.35*(dt*16));
+    s.mesh.position.y-=.018*s.t*(dt*16);
+    s.mesh.material.opacity=Math.max(0,1-s.t*1.2);
+    if(s.t>.9){scene.remove(s.mesh);s.mesh.material.dispose();activeSparks.splice(i,1);}
+  }
+  /* Debris */
+  for(var i=activeDebris.length-1;i>=0;i--){
+    var d=activeDebris[i];d.t+=dt*3.1;
+    d.mesh.position.x+=d.vel.x*(dt*16);
+    d.mesh.position.y+=(d.vel.y-d.t*.008)*(dt*16);
+    d.mesh.position.z+=d.vel.z*(dt*16);
+    if(d.t>1){scene.remove(d.mesh);d.mesh.material.dispose();activeDebris.splice(i,1);}
+  }
+}
+
+function spawnMuzzleFlash(isPulse){
+  /* Screen shake */
+  screenShake=isPulse?.018:.009;
+  if(isPulse){
+    /* Pulse flash — bright green burst */
+    pulseLight.intensity=6;
+    pulseLight.color.setHex(0x00ff88);
+    setTimeout(function(){pulseLight.intensity=3;},40);
+    setTimeout(function(){pulseLight.intensity=0;},120);
+    /* Green screen tint flash */
+    var gf=document.getElementById('greenFlash');
+    gf.style.opacity=.13;
+    setTimeout(function(){gf.style.opacity=0;},80);
+    /* Pulse bolt — visible energy projectile */
+    var bolt=new THREE.Mesh(boltGeo,boltMat.clone());
+    bolt.material.color.setHex(0x00ff88);
+    var boltPos=new THREE.Vector3(0,-.1,-1.1);
+    boltPos.applyQuaternion(camera.quaternion);
+    boltPos.add(camera.position);
+    bolt.position.copy(boltPos);
+    bolt.quaternion.copy(camera.quaternion);
+    bolt.rotation.x+=Math.PI/2;
+    scene.add(bolt);
+    var boltDir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    activeBolts.push({mesh:bolt,dir:boltDir,t:0});
+    /* Bolt glow — short-lived temp light */
+    var bg=new THREE.PointLight(0x00ff88,3,5);
+    bg.position.copy(boltPos);
+    addTempLight(bg,120);
+  } else {
+    /* Pistol — orange flash */
+    muzzleLight.intensity=5;
+    muzzleLight.color.setHex(0xffaa22);
+    setTimeout(function(){muzzleLight.intensity=2.5;},35);
+    setTimeout(function(){muzzleLight.intensity=0;},90);
+    /* Spark particle — shoots forward and arcs down */
+    var spark=new THREE.Mesh(sparkGeo,sparkMat.clone());
+    var sparkPos=new THREE.Vector3(0.08,-.22,-.88);
+    sparkPos.applyQuaternion(camera.quaternion);
+    sparkPos.add(camera.position);
+    spark.position.copy(sparkPos);scene.add(spark);
+    var sparkDir=new THREE.Vector3((Math.random()-.5)*.4,(Math.random()-.5)*.4,-1).applyQuaternion(camera.quaternion).normalize();
+    activeSparks.push({mesh:spark,dir:sparkDir,t:0});
+    /* Small damage flash */
+    flashDiv.style.background='#cc6600';flashDiv.style.opacity=.07;setTimeout(function(){flashDiv.style.opacity=0;},60);
+  }
+}
+
+/* Impact effect at hit point — capped particle count, frame-driven */
+function spawnImpact(point,isPulse){
+  var col=isPulse?0x00ff88:0xffcc44;
+  var imp=new THREE.PointLight(col,isPulse?6:4,isPulse?4:3);
+  imp.position.copy(point);
+  addTempLight(imp,isPulse?160:100);
+  /* Debris sparks — capped total active count to avoid runaway during rapid fire */
+  var n=isPulse?5:3;
+  if(activeDebris.length<60){
+    for(var si=0;si<n;si++){
+      var ds=new THREE.Mesh(debrisGeo,new THREE.MeshBasicMaterial({color:col}));
+      ds.position.copy(point);scene.add(ds);
+      var dv={x:(Math.random()-.5)*.12,y:Math.random()*.12,z:(Math.random()-.5)*.12};
+      activeDebris.push({mesh:ds,vel:dv,t:0,col:col});
+    }
+  }
+}
+
+function shoot(){
+  if(logOpen)return;
+  if(game.ammo<=0){snd.empty();showMsg('OUT OF AMMO');return;}
+  game.ammo--;snd.shoot();
+  var isPulse=weapon==='pulse'&&pulseRifle.visible;
+  var dmg=isPulse?25:10;
+
+  /* Recoil animation */
+  if(isPulse){
+    pulseRifle.position.z=-.46;pulseRifle.rotation.x=.08;
+    setTimeout(function(){pulseRifle.position.z=-.56;pulseRifle.rotation.x=0;},110);
+    beep(160,.06,'sawtooth',.18);beep(520,.12,'sine',.14,.04);beep(900,.08,'sine',.06,.1);
+  } else {
+    gun.position.z=-.5;gun.position.y=-.35;gun.rotation.x=.12;
+    setTimeout(function(){gun.position.z=-.58;gun.position.y=-.28;gun.rotation.x=0;},80);
+  }
+
+  /* Muzzle flash + effects */
+  spawnMuzzleFlash(isPulse);
+
+  /* Raycast hit */
+  raycaster.setFromCamera({x:0,y:0},camera);
+  var targets=aliens.filter(function(a){return a.health>0;}).map(function(a){return a.group;});
+  var hits=raycaster.intersectObjects(targets,true);
+  if(hits.length){
+    var hitPt=hits[0].point;
+    spawnImpact(hitPt,isPulse);
+    var obj=hits[0].object;
+    while(obj&&!obj.userData.alienRef)obj=obj.parent;
+    if(obj){
+      var a=obj.userData.alienRef;
+      a.health-=dmg;
+      snd.hit();
+      /* Hit flash on alien */
+      obj.traverse(function(m){if(m.isMesh&&m.material){var oc=m.material.emissiveIntensity||0;m.material.emissiveIntensity=isPulse?4:2.5;setTimeout(function(){m.material.emissiveIntensity=oc;},isPulse?180:100);}});
+      if(a.health<=0){
+        a.group.visible=false;
+        if(a.isBoss&&!a.isQueen){game.credits+=50;triggerWin();}
+        else if(a.isQueen){game.credits+=100;showMsg('QUEEN ELIMINATED +100 CR');}
+        else{game.credits+=10;showMsg(a.name+' ELIMINATED +10 CR');}
+      }
+    }
+  } else {
+    /* Wall impact */
+    var wallHits=raycaster.intersectObjects(scene.children,false);
+    if(wallHits.length&&wallHits[0].distance<60) spawnImpact(wallHits[0].point,isPulse);
+  }
+  updateHud();
+}
+
+/* Screen shake in render loop — applied as camera position nudge */
+var _shakeV={x:0,y:0};
+function applyScreenShake(){
+  if(screenShake<=0)return;
+  _shakeV.x=(Math.random()-.5)*screenShake;
+  _shakeV.y=(Math.random()-.5)*screenShake;
+  camera.position.x+=_shakeV.x;
+  camera.position.y+=_shakeV.y;
+  screenShake=Math.max(0,screenShake-.002);
+}
+
+/* ===== LOSE ===== */
+function loseGame(){
+  if(game.over)return;game.over=true;document.exitPointerLock();
+  document.getElementById('deathScreen').style.display='flex';
+}
+
+/* ===== WIN + CUTSCENE ===== */
+function triggerWin(){
+  if(game.won)return;game.won=true;document.exitPointerLock();snd.win();
+  showMsg('BIOMASS PRIME ELIMINATED  +50 CR',3000);
+  reactorGlow.intensity=.5;
+  corridorLights.forEach(function(l){l.intensity=2;});
+  setTimeout(showCutscene,2800);
+}
+function showCutscene(){
+  var cs=document.getElementById('cutscene');var txt=document.getElementById('cutsceneText');
+  cs.style.display='flex';
+  var frames=[
+    {d:0,   h:'<h2>OBJECTIVE COMPLETE</h2><p>BIOMASS PRIME — ELIMINATED<br><span class="dim">Reactor stable. Pressure normalising.</span></p>'},
+    {d:3500, h:'<p>The station goes quiet for the first time in days.<br>Emergency lights stop flickering.<br>Air recyclers slowly restart.</p>'},
+    {d:7000, h:'<p style="color:#e74c3c">But the station is not clear.</p>'},
+    {d:10000,h:'<p class="dim">— — — &nbsp; INCOMING TRANSMISSION &nbsp; — — —</p>'},
+    {d:13000,h:'<p><span style="color:#2ecc71;letter-spacing:3px;">HAYES //</span><br><br>This is Commander Hayes.<br>We have secured the docking bay.<br>We are outside the south wall now.</p>'},
+    {d:18000,h:'<p><span style="color:#2ecc71;letter-spacing:3px;">HAYES //</span><br><br>Station is not clear. Multiple contacts still inside.<br>Communications Wing is offline — we cannot call reinforcements.<br>We need that wing cleared and comms restored.</p>'},
+    {d:23500,h:'<p><span style="color:#2ecc71;letter-spacing:3px;">HAYES //</span><br><br>I\'m authorising emergency access.<br>Command keycard is coming through the bay hatch now.<br>Meet me at the docking bay. We\'ll brief you in person.</p>'},
+    {d:28000,h:'<h2 style="color:#ffd966;letter-spacing:6px;">CHAPTER 1.5</h2><p style="color:#2ecc71;letter-spacing:4px;font-size:15px;">LOCKDOWN</p><p class="dim">The station was never safe.<br>Finish what you started.</p><button onclick="window.startCh15()">&#9658; CONTINUE</button>'},
+  ];
+  frames.forEach(function(f){setTimeout(function(){txt.innerHTML=f.h;},f.d);});
+}
+
+/* ===== MAIN LOOP ===== */
+var clock=new THREE.Clock();
+var hudThrottle=0;
+function animate(){
+  requestAnimationFrame(animate);
+  var dt=Math.min(.05,clock.getDelta());
+  var t=clock.elapsedTime;
+  if(game.started&&!game.over&&!game.won&&!logOpen){
+    var spd=4.5*dt,dx=0,dz=0;
+    if(keys.w){dx-=Math.sin(yaw)*spd;dz-=Math.cos(yaw)*spd;}
+    if(keys.s){dx+=Math.sin(yaw)*spd;dz+=Math.cos(yaw)*spd;}
+    if(keys.a){dx-=Math.cos(yaw)*spd;dz+=Math.sin(yaw)*spd;}
+    if(keys.d){dx+=Math.cos(yaw)*spd;dz-=Math.sin(yaw)*spd;}
+    movePlayer(dx,dz);
+
+    /* Doors */
+    var px=camera.position.x,pz=camera.position.z;
+    doors.forEach(function(d){
+      if(d.key===null&&!d.open&&!d.opening){var ddx=d.mesh.position.x-px,ddz=d.mesh.position.z-pz;if(Math.sqrt(ddx*ddx+ddz*ddz)<4){d.opening=true;snd.autoDoor();}}
+      if(d.opening){d.progress=Math.min(1,d.progress+dt*1.3);d.mesh.position.y=d.baseY+d.progress*8.5;if(d.progress>=1){d.open=true;d.opening=false;}}
+    });
+
+    /* Pickups */
+    nearLog=null;nearDoor=null;nearNpc=null;nearShop=false;
+    for(var i=pickups.length-1;i>=0;i--){
+      var p=pickups[i];var ddx=p.mesh.position.x-px,ddz=p.mesh.position.z-pz;var dist=Math.sqrt(ddx*ddx+ddz*ddz);
+      if(p.type!=='log')p.mesh.rotation.y+=.025;
+      if(dist<p.range){
+        if(p.type==='key'){game.keys[p.key]=true;snd.pickup();showMsg((p.key==='red'?'\uD83D\uDD34 RED':'\uD83D\uDD35 BLUE')+' KEYCARD ACQUIRED');scene.remove(p.mesh);pickups.splice(i,1);}
+        else if(p.type==='ammo'){game.ammo+=p.value;snd.pickup();showMsg('+'+p.value+' AMMUNITION');scene.remove(p.mesh);pickups.splice(i,1);}
+        else if(p.type==='health'){game.health=Math.min(game.maxHealth,game.health+35);snd.pickup();showMsg('+35 HP (MEDKIT)');scene.remove(p.mesh);pickups.splice(i,1);}
+        else if(p.type==='log'){nearLog=p;}
+      }
+    }
+    for(var di=0;di<doors.length;di++){var d=doors[di];if(d.open||d.key===null)continue;var ddx=d.mesh.position.x-px,ddz=d.mesh.position.z-pz;if(Math.sqrt(ddx*ddx+ddz*ddz)<5)nearDoor=d;}
+    var prompt='';
+    if(ch15.active&&ch15.nearHayes)prompt='[E] TALK — COMMANDER HAYES';
+    else if(ch15.active&&ch15.terminalNear)prompt=ch15.timerStarted?'[E] RESET TIMER':'[E] BLAST DOOR OVERRIDE';
+    else if(ch15.active&&ch15.commsNear)prompt='[E] RESTORE COMMUNICATIONS UPLINK';
+    else if(nearShop&&!ch15.active)prompt='[E] SUPPLY DEPOT';
+    else if(nearNpc)prompt='[E] TALK — '+nearNpc.name;
+    else if(nearLog)prompt='[E] READ DOCUMENT';
+    else if(nearDoor)prompt=nearDoor.key==='command'?(game.keys.command?'[E] OPEN COMMUNICATIONS WING':'[E] COMMUNICATIONS WING — COMMAND KEY REQUIRED'):(game.keys[nearDoor.key]?'[E] OPEN '+nearDoor.name:nearDoor.name+' — LOCKED ('+nearDoor.key.toUpperCase()+' KEY)');
+    promptEl.textContent=prompt;promptEl.style.opacity=prompt?1:0;
+
+    /* Aliens */
+    aliens.forEach(function(a){
+      if(a.health<=0)return;
+      var ddx=camera.position.x-a.group.position.x,ddz=camera.position.z-a.group.position.z;
+      var dist=Math.sqrt(ddx*ddx+ddz*ddz);
+      if(a.isBoss){
+        if(a.health<80&&!a.phase2){a.phase2=true;a.speed*=1.35;showMsg('\u26a0  BIOMASS PRIME \u2014 PHASE 2',3500);flashOrange();snd.growl();}
+        if(a.health<35&&!a.phase3){a.phase3=true;a.speed*=1.5;a.damage+=10;showMsg('\u26a0  CRITICAL PHASE \u2014 MAXIMUM THREAT',4000);flashOrange();setTimeout(flashOrange,500);snd.growl();}
+      }
+      if(dist<a.detectRange){
+        if(!a.awake){a.awake=true;snd.growl();showMsg(a.isBoss?'\u26a0  BIOMASS PRIME AWAKENS...':'Something moves in the dark.');}
+        var nx=a.group.position.x+(ddx/dist)*a.speed*dt,nz=a.group.position.z+(ddz/dist)*a.speed*dt;
+        if(!blocked(nx,nz)||a.isBoss){a.group.position.x=nx;a.group.position.z=nz;}
+        a.group.lookAt(camera.position.x,a.group.position.y,camera.position.z);
+        if(dist<a.attackRange&&t-a.lastAttack>1.1){game.health-=a.damage;a.lastAttack=t;snd.hurt();flashRed();if(game.health<=0)loseGame();}
+      }
+    });
+
+    /* Stalker */
+    if(stalkerVisible){
+      stalker.position.y=Math.sin(t*1.3)*.07;
+      var sdx=camera.position.x-stalker.position.x,sdz=camera.position.z-stalker.position.z;
+      var sdist=Math.sqrt(sdx*sdx+sdz*sdz);
+      if(!stalkerNoticed&&sdist<22){stalkerNoticed=true;stalker.lookAt(camera.position.x,stalker.position.y,camera.position.z);}
+      if(sdist<7){stalker.visible=false;stalkerVisible=false;corridorLights.forEach(function(l){l.intensity=18;});setTimeout(function(){corridorLights.forEach(function(l){l.intensity=0;});},100);setTimeout(function(){corridorLights.forEach(function(l){l.intensity=4;});},220);}
+    }
+
+    /* Ambient animations */
+    reactorGlow.intensity=4+Math.sin(t*2.5)*2;
+    hubLight.intensity=2+Math.sin(t*1.8)*.8;
+    corridorLights.forEach(function(l){
+      if(game.powerFailed){l.intensity=Math.random()<.05?0:Math.abs(Math.sin(t*30+l.userData.flicker))*20;}
+      else{l.intensity=3+Math.sin(t*8+l.userData.flicker)*3;}
+    });
+    updateZone();
+    hudThrottle+=dt;
+    if(hudThrottle>=0.1){hudThrottle=0;updateHud();}  // 10x/sec is plenty for UI, was 60x/sec
+    applyScreenShake();
+    /* Ch1.5 update */
+    if(ch15.active) updateCh15(dt);
+    /* Grenades */
+    if(grenadeCount>0||grenades.length>0) updateGrenades(dt,t);
+    /* Shooting effects — bolts, sparks, debris, temp lights (frame-driven, no setInterval) */
+    updateEffects(dt);
+  }
+  renderer.render(scene,camera);
+}
+
+
+/* ================================================================
+   CHAPTER 1.5 — LOCKDOWN
+   New sector: Communications Wing (opposite of Med Wing in Hub)
+   Commander Hayes gives keycard, player enters, triggers blast-door
+   override timer (3 min), must clear aliens + restore comms + escape.
+================================================================ */
+
+/* ===== CH1.5 STATE ===== */
+var ch15={
+  active:false,
+  hasKeycard:false,       // received from Hayes
+  wingUnlocked:false,     // comms wing door opened
+  timerStarted:false,     // security terminal activated
+  timerRunning:false,
+  timerLeft:180,          // 3:00 countdown
+  aliensCleared:false,
+  commsRestored:false,
+  escaped:false,
+  terminalNear:false,     // near security terminal
+  commsNear:false,        // near comms terminal
+  spawnedAliens:[],       // aliens spawned in the wing
+  wingDoors:[],           // blast doors inside wing (open on timer)
+  hayes:null,             // commander mesh group
+  hayesArrow:null,        // bouncing arrow DOM el
+  hayesBriefed:false,
+};
+
+/* Ch1.5 objects for scene management */
+var ch15Objects=[];
+
+/* ===== ZONE UPDATE: add comms wing zone ===== */
+ZONES.push({name:'COMMUNICATIONS WING',xmin:-70,xmax:-30,zmin:-70,zmax:-35});
+ZONES.push({name:'SECURITY OFFICE',xmin:-70,xmax:-45,zmin:-40,zmax:-35});
+ZONES.push({name:'COMMS TERMINAL — RESTRICTED',xmin:-70,xmax:-45,zmin:-60,zmax:-50});
+
+/* ===== BUILD COMMS WING (called when Ch1.5 starts) ===== */
+function buildCommsWing(){
+  /* ── LAYOUT: x[-70,-30] z[-70,-35] ─────────────────────────────
+     Enters from Hub via door at x=-30,z=-52.5 (opposite Med Wing)
+     Layout inside (south-to-north):
+       Entry corridor  z[-40,-35]  x[-50,-30]
+       Security office z[-45,-35]  x[-70,-50]
+       Main comms room z[-65,-45]  x[-70,-30]
+       Server alcove   z[-70,-65]  x[-60,-40]
+  ──────────────────────────────────────────────────────────────── */
+  function mkCW(x,y,z,w,h,d,col){
+    var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col||0x2a2e38,roughness:.9}));
+    m.position.set(x,y,z);scene.add(m);ch15Objects.push(m);
+    colliders.push(new THREE.Box3().setFromObject(m));return m;
+  }
+  function mkCWdeco(x,y,z,w,h,d,col){
+    var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col||0x2a2e38,roughness:.9}));
+    m.position.set(x,y,z);scene.add(m);ch15Objects.push(m);return m;
+  }
+  function cwLight(x,y,z,col,int,dist){
+    var l=new THREE.PointLight(col,int,dist);l.position.set(x,y,z);scene.add(l);ch15Objects.push(l);return l;
+  }
+
+  /* ── Outer walls ── */
+  mkCW(-50,4,-35,40,8,1);          // south wall (entry side)
+  mkCW(-50,4,-70,40,8,1);          // north wall
+  mkCW(-30,4,-52.5,1,8,35);        // east wall (Hub side — no door here, door already in Hub)
+  mkCW(-70,4,-52.5,1,8,35);        // west wall
+  /* Ceiling */
+  mkCWdeco(-50,8,-52.5,40,.4,35,0x1e2228);
+
+  /* ── Entry corridor divider z[-40,-35] ── */
+  mkCW(-42,4,-40,16,8,1,0x2a2e38);   // divider wall with gap for door
+
+  /* ── BLAST DOOR at corridor entrance z=-40 — slides up on timer ── */
+  var bd1=new THREE.Mesh(new THREE.BoxGeometry(16,8,0.5),new THREE.MeshStandardMaterial({color:0x551111,emissive:0x220808,emissiveIntensity:.5,metalness:.5}));
+  bd1.position.set(-42,4,-40);scene.add(bd1);ch15Objects.push(bd1);
+  var bd1Col=new THREE.Box3().setFromObject(bd1);colliders.push(bd1Col);
+  var bd1Light=new THREE.PointLight(0xff2200,1,8);bd1Light.position.set(-42,7.5,-40.3);scene.add(bd1Light);ch15Objects.push(bd1Light);
+  ch15.wingDoors.push({mesh:bd1,col:bd1Col,light:bd1Light,open:false,progress:0});
+
+  /* ── Security Office x[-70,-50] z[-45,-35] ── */
+  mkCW(-60,4,-45,20,8,1);           // south wall of security office
+  mkCW(-50,4,-40,1,8,10);           // east wall
+  /* Security terminal desk */
+  mkCW(-65,1,-38,6,1,2,0x3a3e46);
+  mkCWdeco(-65,1.6,-38,5.8,.12,1.8,0x222);
+  /* Terminal screen — THE security override button */
+  var termScreen=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.8,.08),new THREE.MeshStandardMaterial({color:0x001100,emissive:0x00cc33,emissiveIntensity:.8}));
+  termScreen.position.set(-62,2.5,-38.9);scene.add(termScreen);ch15Objects.push(termScreen);
+  var termLight=cwLight(-62,3,-39,0x00ff44,2,8);
+  /* "SECURITY TERMINAL" label light */
+  cwLight(-65,5,-37,0x2244ff,.5,6);
+  /* Lockers */
+  [-36,-38,-40,-42].forEach(function(lz){mkCW(-69,1.5,lz,1,3,1.6,0x2e3d4d);});
+
+  /* ── BLAST DOOR between sec office and main comms z=-45 ── */
+  var bd2=new THREE.Mesh(new THREE.BoxGeometry(20,8,0.5),new THREE.MeshStandardMaterial({color:0x551111,emissive:0x220808,emissiveIntensity:.5,metalness:.5}));
+  bd2.position.set(-60,4,-45);scene.add(bd2);ch15Objects.push(bd2);
+  var bd2Col=new THREE.Box3().setFromObject(bd2);colliders.push(bd2Col);
+  var bd2Light=new THREE.PointLight(0xff2200,1,8);bd2Light.position.set(-60,7.5,-45.3);scene.add(bd2Light);ch15Objects.push(bd2Light);
+  ch15.wingDoors.push({mesh:bd2,col:bd2Col,light:bd2Light,open:false,progress:0});
+
+  /* ── Main Communications Room x[-70,-30] z[-65,-45] ── */
+  mkCW(-50,4,-65,40,8,1);           // north wall of main room
+  /* Dividing partition at x=-50 between east+west halves */
+  mkCW(-50,4,-55,1,8,10);
+  /* Comms consoles — rows of desks with screens */
+  [[-65,-50],[-65,-55],[-65,-60],[-35,-50],[-35,-55],[-35,-60]].forEach(function(pos){
+    mkCW(pos[0],1,pos[1],6,1,2,0x3a3e46);
+    mkCWdeco(pos[0],1.6,pos[1],5.8,.12,1.8,0x111);
+    /* Screen glow */
+    var sc=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.2,.06),new THREE.MeshStandardMaterial({color:0x002211,emissive:0x00aaff,emissiveIntensity:.7}));
+    sc.position.set(pos[0]+1.5,2.2,pos[1]-.9);scene.add(sc);ch15Objects.push(sc);
+    cwLight(pos[0],3,pos[1],0x0044aa,.4,7);
+  });
+  /* Ceiling lights — red emergency, turns green on comms restored */
+  var cwEmergLights=[];
+  [-48,-55,-62].forEach(function(lz){
+    var el=cwLight(-50,7,lz,0xff2200,2,14);
+    cwEmergLights.push(el);
+    ch15.emergLights=cwEmergLights;
+  });
+
+  /* ── COMMUNICATIONS MASTER TERMINAL ── centre of main room ── */
+  var commsDesk=new THREE.Mesh(new THREE.BoxGeometry(3,1,3),new THREE.MeshStandardMaterial({color:0x1a2233,metalness:.5}));
+  commsDesk.position.set(-50,1,-55);scene.add(commsDesk);ch15Objects.push(commsDesk);
+  colliders.push(new THREE.Box3().setFromObject(commsDesk));
+  /* Main screen — large, bright */
+  var mainScreen=new THREE.Mesh(new THREE.BoxGeometry(2.8,2.2,.08),new THREE.MeshStandardMaterial({color:0x000811,emissive:0x0055cc,emissiveIntensity:1.2}));
+  mainScreen.position.set(-50,2.6,-55);scene.add(mainScreen);ch15Objects.push(mainScreen);
+  cwLight(-50,4,-55,0x0066ff,3,12);
+  /* Satellite dish on desk */
+  var dish=new THREE.Mesh(new THREE.TorusGeometry(.5,.06,8,20),new THREE.MeshStandardMaterial({color:0x445566,metalness:.6}));
+  dish.rotation.x=-0.5;dish.position.set(-50,1.8,-54);scene.add(dish);ch15Objects.push(dish);
+
+  /* ── Server alcove z[-70,-65] x[-60,-40] ── */
+  mkCW(-50,4,-70,20,8,1);           // far north wall
+  mkCW(-40,4,-67.5,1,8,5);          // east alcove wall
+  mkCW(-60,4,-67.5,1,8,5);          // west alcove wall
+  /* Server racks */
+  [[-58,-68],[-54,-68],[-50,-68],[-46,-68],[-42,-68]].forEach(function(p){
+    mkCW(p[0],2.5,p[1],2.5,5,.6,0x1a1e26);
+    var sl=new THREE.Mesh(new THREE.BoxGeometry(2,.1,.4),new THREE.MeshStandardMaterial({color:0x002200,emissive:0x00ff44,emissiveIntensity:.4}));
+    sl.position.set(p[0],4.5,p[1]+.1);scene.add(sl);ch15Objects.push(sl);
+    cwLight(p[0],3.5,p[1],0x00ff44,.3,4);
+  });
+
+  /* ── Floor grid ── */
+  var cwFloor=new THREE.Mesh(new THREE.PlaneGeometry(40,35),new THREE.MeshStandardMaterial({color:0x0f1115,roughness:.95}));
+  cwFloor.rotation.x=-Math.PI/2;cwFloor.position.set(-50,0.01,-52.5);scene.add(cwFloor);ch15Objects.push(cwFloor);
+
+  /* Store refs for runtime */
+  ch15.terminalPos=new THREE.Vector3(-62,0,-38);  // security terminal position
+  ch15.commsPos=new THREE.Vector3(-50,0,-55);      // comms terminal position
+  ch15.emergLights=cwEmergLights;
+  ch15.termLight=termLight;
+}
+
+/* ===== SPAWN COMMS WING ALIENS ===== */
+function spawnCommsAliens(){
+  /* Called when timer starts — aliens burst from vents/shadows */
+  var positions=[
+    [-38,-37],[-45,-42],[-55,-48],
+    [-34,-52],[-65,-52],[-45,-58],
+    [-55,-62],[-38,-62],[-50,-68]
+  ];
+  positions.forEach(function(p,i){
+    var g=new THREE.Group();
+    /* Body */
+    var body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,1.3,4,8),new THREE.MeshStandardMaterial({color:0x1a2a1a,roughness:.7}));
+    body.position.y=.9;g.add(body);
+    /* Eyes */
+    [-1,1].forEach(function(s){
+      var eye=new THREE.Mesh(new THREE.SphereGeometry(.07,6,6),new THREE.MeshStandardMaterial({color:0xff3333,emissive:0xff3333,emissiveIntensity:2.5}));
+      eye.position.set(.12*s,1.55,.4);g.add(eye);
+    });
+    /* Glow */
+    var gl=new THREE.PointLight(0xff2200,.8,5);gl.position.set(0,1,0);g.add(gl);
+    g.position.set(p[0],0,p[1]);scene.add(g);
+    var isHeavy=(i%3===2);
+    var a={group:g,health:isHeavy?40:20,maxHealth:isHeavy?40:20,speed:isHeavy?1.8:3.5,detectRange:25,attackRange:1.6,damage:isHeavy?15:8,lastAttack:0,isBoss:false,name:isHeavy?'Brute':'Crawler',awake:true,phase2:false,phase3:false,type:'comms'};
+    g.userData.alienRef=a;
+    aliens.push(a);
+    ch15.spawnedAliens.push(a);
+  });
+  showMsg('⚠ CONTACTS DETECTED — ELIMINATE ALL THREATS',3000);
+  flashOrange();snd.growl();
+}
+
+/* ===== COMMANDER HAYES NPC ===== */
+function buildHayesCh15(){
+  if(ch15.hayes) return;
+  /* Hayes stands in the docking bay south area after cutscene */
+  var g=new THREE.Group();
+  /* Body */
+  var torso=new THREE.Mesh(new THREE.BoxGeometry(.6,1.0,.3),new THREE.MeshStandardMaterial({color:0x1a3322,roughness:.7}));
+  torso.position.y=1.35;g.add(torso);
+  /* Head */
+  var head=new THREE.Mesh(new THREE.BoxGeometry(.42,.42,.4),new THREE.MeshStandardMaterial({color:0x7a5a3a,roughness:.8}));
+  head.position.y=2.15;g.add(head);
+  /* Helmet */
+  var helm=new THREE.Mesh(new THREE.BoxGeometry(.48,.25,.46),new THREE.MeshStandardMaterial({color:0x223322,metalness:.4}));
+  helm.position.y=2.44;g.add(helm);
+  /* Visor */
+  var visor=new THREE.Mesh(new THREE.BoxGeometry(.36,.14,.08),new THREE.MeshStandardMaterial({color:0x88ccff,emissive:0x2266aa,emissiveIntensity:.7,transparent:true,opacity:.7}));
+  visor.position.set(0,2.22,.22);g.add(visor);
+  /* Shoulders */
+  [-1,1].forEach(function(s){
+    var sh=new THREE.Mesh(new THREE.BoxGeometry(.22,.12,.32),new THREE.MeshStandardMaterial({color:0x2ecc71,emissive:0x0a4422,emissiveIntensity:.5}));
+    sh.position.set(s*.42,1.8,0);g.add(sh);
+  });
+  /* Legs */
+  [-1,1].forEach(function(s){
+    var leg=new THREE.Mesh(new THREE.BoxGeometry(.25,.9,.25),new THREE.MeshStandardMaterial({color:0x1a2a1a,roughness:.9}));
+    leg.position.set(s*.17,.45,0);g.add(leg);
+  });
+  /* Rifle */
+  var rifle=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,.7),new THREE.MeshStandardMaterial({color:0x111,metalness:.7}));
+  rifle.position.set(.32,1.3,.0);g.add(rifle);
+  /* Glow */
+  var cl=new THREE.PointLight(0x2ecc71,.8,8);cl.position.set(0,2.5,0);g.add(cl);
+  /* Place Hayes near south wall, inside docking bay */
+  g.position.set(0,0,17);
+  scene.add(g);ch15Objects.push(g);
+  ch15.hayes={mesh:g,briefed:false};
+
+  /* Bouncing quest arrow */
+  var arrow=document.createElement('div');
+  arrow.className='questArrow';
+  arrow.id='hayesArrow';
+  arrow.textContent='▼';
+  document.body.appendChild(arrow);
+  ch15.hayesArrow=arrow;
+}
+
+function updateHayesArrow(){
+  var arrow=ch15.hayesArrow;
+  if(!arrow||!ch15.hayes) return;
+  if(ch15.hasKeycard){arrow.style.display='none';return;}
+  var pos=new THREE.Vector3();
+  ch15.hayes.mesh.getWorldPosition(pos);pos.y+=3.2;
+  pos.project(camera);
+  var sx=(pos.x*.5+.5)*window.innerWidth;
+  var sy=(-.5*pos.y+.5)*window.innerHeight-55;
+  if(pos.z>1){arrow.style.display='none';return;}
+  arrow.style.display='block';arrow.style.left=sx+'px';arrow.style.top=sy+'px';
+}
+
+/* ===== OPEN HAYES DIALOGUE ===== */
+function openHayesBriefing(){
+  var ov=document.getElementById('commanderOverlay');
+  var txt=document.getElementById('cmdText');
+  var tasks=document.getElementById('cmdTasks');
+  var status=document.getElementById('cmdStatus');
+  if(!ch15.hayesBriefed){
+    txt.textContent='Operative. You held. I\'m impressed.\n\nStation is not clear though. Communications wing — opposite end of the hub from Medical — has gone dark. Multiple hostiles confirmed inside.\n\nWe need those comms online. Without them we can\'t call in the extraction fleet.\n\nHere\'s what you do:\n1. Take this Command Keycard. Opens the wing.\n2. Get to the Security Office inside. Hit the blast door override.\n3. You\'ll have three minutes. Clear the room, reach the Comms Terminal, restore the uplink.\n\nDon\'t let that timer hit zero.';
+    ch15.hayesBriefed=true;
+  } else {
+    txt.textContent=ch15.hasKeycard?
+      'You have the keycard. Communications Wing is on the opposite side of the hub from Medical.\n\nGet in there. Security office first — blast door override will open everything up.\n\nYou have three minutes once that timer starts.':
+      'Go. I\'ll hold the bay.';
+  }
+  var c=function(done){return '<span style="color:'+(done?'#2ecc71':'#667788')+';margin-right:8px;">'+(done?'✔':'○')+'</span>';};
+  tasks.innerHTML=
+    c(ch15.hasKeycard)+'<span style="font-size:11px;color:#99bbaa;letter-spacing:1px;">Receive Command Keycard</span><br style="line-height:2.5">'+
+    c(ch15.wingUnlocked)+'<span style="font-size:11px;color:#99bbaa;letter-spacing:1px;">Access Communications Wing</span><br style="line-height:2.5">'+
+    c(ch15.timerStarted)+'<span style="font-size:11px;color:#99bbaa;letter-spacing:1px;">Trigger blast door override</span><br style="line-height:2.5">'+
+    c(ch15.commsRestored)+'<span style="font-size:11px;color:#99bbaa;letter-spacing:1px;">Restore communications uplink</span>';
+  status.textContent=ch15.commsRestored?'✔ MISSION COMPLETE':'CLEARANCE GRANTED — PROCEED';
+
+  /* Give keycard on first talk */
+  if(!ch15.hasKeycard){
+    ch15.hasKeycard=true;
+    game.keys.command=true;
+    setTimeout(function(){showMsg('⬛ COMMAND KEYCARD RECEIVED',3000);snd.pickup();},500);
+  }
+  ov.style.display='flex';logOpen=true;document.exitPointerLock();
+}
+
+/* ===== START CH1.5 (called from cutscene button) ===== */
+function startCh15(){
+  document.getElementById('cutscene').style.display='none';
+  ch15.active=true;
+  game.won=false;game.over=false;
+  /* Restore some health + ammo */
+  game.health=Math.min(100,game.health+40);
+  game.ammo=Math.max(game.ammo,20);
+  game.credits+=60;
+  /* Spawn Hayes in docking bay */
+  buildHayesCh15();
+  /* Add comms wing door in hub — opposite side from Med Wing */
+  /* Hub already has mkDoor(30,4,-90...) for Med. Add command door on west side at (-30,4,-90) */
+  commsWingDoor=mkDoor(-30,4,-90,1,8,10,'command','COMMUNICATIONS WING');
+  /* Build the wing geometry */
+  buildCommsWing();
+  /* Restore corridor lights */
+  corridorLights.forEach(function(l){l.intensity=4;});
+  scene.traverse(function(o){if(o.isPointLight&&!corridorLights.includes(o)&&o!==reactorGlow)o.intensity=Math.min(o.intensity*5,3);});
+  showMsg('CHAPTER 1.5 — LOCKDOWN  //  Find Commander Hayes',4000);
+  var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});
+  updateHud();
+}
+window.startCh15=startCh15;
+window.closeCommander=function(){
+  document.getElementById('commanderOverlay').style.display='none';
+  logOpen=false;
+  var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});
+};
+
+/* Command door reference */
+var commsWingDoor=null;
+
+/* ===== SECURITY TERMINAL INTERACTION ===== */
+function activateSecurityTerminal(){
+  if(ch15.timerStarted){
+    /* Reset timer if they come back */
+    ch15.timerLeft=180;
+    showMsg('⏱ TIMER RESET — 3:00',2000);
+    snd.pickup();
+    return;
+  }
+  ch15.timerStarted=true;
+  ch15.timerRunning=true;
+  ch15.timerLeft=180;
+  /* Open all blast doors */
+  ch15.wingDoors.forEach(function(d){
+    d.open=true;
+    /* Animate sliding up */
+    var startY=d.mesh.position.y;
+    var t0=performance.now();
+    d.light.color.setHex(0x00ff44);
+    function animBD(){
+      var prog=Math.min(1,(performance.now()-t0)/800);
+      d.mesh.position.y=startY+prog*9;
+      var ci=colliders.indexOf(d.col);if(ci>=0)colliders.splice(ci,1);
+      if(prog<1)requestAnimationFrame(animBD);
+    }
+    animBD();
+    snd.door();
+  });
+  /* Spawn aliens throughout wing */
+  spawnCommsAliens();
+  showMsg('⚠ BLAST DOORS OPEN — 3:00 REMAINING',4000);
+  flashOrange();
+  /* Emergency lights pulse red */
+  if(ch15.emergLights) ch15.emergLights.forEach(function(l){l.color.setHex(0xff0000);l.intensity=3;});
+  updateHud();
+}
+
+/* ===== COMMS TERMINAL INTERACTION ===== */
+function activateCommsTerminal(){
+  if(!ch15.timerStarted){showMsg('BLAST DOOR OVERRIDE REQUIRED FIRST',2500);snd.locked();return;}
+  if(ch15.commsRestored){showMsg('UPLINK ALREADY ESTABLISHED',2000);return;}
+  /* Check all spawned aliens dead */
+  var alive=ch15.spawnedAliens.filter(function(a){return a.health>0;}).length;
+  if(alive>0){showMsg('CLEAR ALL CONTACTS FIRST — '+alive+' REMAINING',2500);snd.locked();flashRed();return;}
+  /* Restore comms */
+  ch15.commsRestored=true;
+  ch15.aliensCleared=true;
+  ch15.timerRunning=false;
+  snd.win();
+  /* Emergency lights turn green */
+  if(ch15.emergLights) ch15.emergLights.forEach(function(l){l.color.setHex(0x00ff44);l.intensity=2;});
+  showMsg('✔ COMMUNICATIONS UPLINK ESTABLISHED',4000);
+  /* Update comms terminal screen colour */
+  scene.traverse(function(o){
+    if(o.isMesh&&o.material&&o.material.emissive){
+      var p=o.position;
+      if(Math.abs(p.x+50)<2&&Math.abs(p.z+55)<2){o.material.emissive.setHex(0x00ff44);o.material.emissiveIntensity=1.5;}
+    }
+  });
+  /* Trigger win cutscene after short delay */
+  setTimeout(showCh15Victory,2500);
+}
+
+/* ===== CHAPTER 1.5 VICTORY ===== */
+function showCh15Victory(){
+  document.exitPointerLock();
+  var cs=document.getElementById('cutscene');var txt=document.getElementById('cutsceneText');
+  cs.style.display='flex';
+  var frames=[
+    {d:0,   h:'<h2 style="color:#2ecc71">COMMUNICATIONS RESTORED</h2><p>Long-range uplink established.<br><span class="dim">Signal propagating across relay network...</span></p>'},
+    {d:4000, h:'<p><span style="color:#2ecc71;letter-spacing:3px;">HAYES //</span><br><br>You did it. Fleet is responding.<br>Extraction in 48 hours.</p>'},
+    {d:8000, h:'<p><span style="color:#2ecc71;letter-spacing:3px;">HAYES //</span><br><br>But the survey data we pulled from the comms buffer...<br>The infestation is not contained to the station.</p>'},
+    {d:13000,h:'<p style="color:#e74c3c;font-size:14px">Motion contacts beneath the lunar surface.<br>Thousands of them.<br>Organized. Moving toward the station.</p>'},
+    {d:18000,h:'<p>The moon itself is the colony.<br><span class="dim">ECLIPSE-13 was never just a station incident.</span><br><span class="dim">It was the alarm going off.</span></p>'},
+    {d:23000,h:'<h2 style="color:#ffd966;letter-spacing:5px;">OPERATION MOONFALL</h2><p style="color:#2ecc71;letter-spacing:3px;">COMING NEXT</p><p class="dim">The mission changes.<br>The surface is not safe.<br>Hayes needs you outside.</p><button onclick="document.getElementById(\'cutscene\').style.display=\'none\'">■ STATION SECURED</button>'},
+  ];
+  frames.forEach(function(f){setTimeout(function(){txt.innerHTML=f.h;},f.d);});
+}
+
+/* ===== TIMER FAILURE ===== */
+function triggerLockdownFailure(){
+  ch15.timerRunning=false;
+  document.exitPointerLock();
+  var cs=document.getElementById('cutscene');var txt=document.getElementById('cutsceneText');
+  cs.style.display='flex';
+  txt.innerHTML='<h2 style="color:#e74c3c">LOCKDOWN INITIATED</h2><p>Blast doors sealed.<br><span class="dim">You are trapped inside the Communications Wing.</span></p><p style="color:#e74c3c;margin-top:20px;">MISSION FAILED</p><button onclick="window.resetLockdown()" style="margin-top:20px;background:transparent;color:#cfe8ff;border:1px solid #446;padding:11px 28px;font-size:11px;letter-spacing:4px;cursor:pointer;font-family:\'Courier New\',monospace;">↺ RESET TIMER</button>';
+}
+window.resetLockdown=function(){
+  document.getElementById('cutscene').style.display='none';
+  /* Reopen all blast doors, reset timer */
+  ch15.wingDoors.forEach(function(d){
+    d.open=false;d.progress=0;
+    d.mesh.position.y=4;/* back to centre */
+    d.light.color.setHex(0xff2200);
+    if(!colliders.includes(d.col))colliders.push(d.col);
+  });
+  ch15.timerLeft=180;ch15.timerStarted=false;ch15.timerRunning=false;
+  /* Kill spawned aliens */
+  ch15.spawnedAliens.forEach(function(a){a.health=0;a.group.visible=false;});
+  ch15.spawnedAliens=[];
+  camera.position.set(-62,1.75,-37);/* back to security terminal */
+  var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});
+  showMsg('TIMER RESET — START AGAIN FROM SECURITY TERMINAL',3500);
+  updateHud();
+};
+
+/* ===== UPDATE CH1.5 (called from main loop) ===== */
+function updateCh15(dt){
+  if(!ch15.active) return;
+  /* Hayes arrow */
+  updateHayesArrow();
+  /* Hayes faces player */
+  if(ch15.hayes&&ch15.hayes.mesh){
+    ch15.hayes.mesh.lookAt(camera.position.x,ch15.hayes.mesh.position.y,camera.position.z);
+  }
+  /* Timer countdown */
+  if(ch15.timerRunning&&!ch15.commsRestored){
+    ch15.timerLeft-=dt;
+    /* Flash warning */
+    if(ch15.timerLeft<30&&Math.floor(ch15.timerLeft)%2===0){
+      if(ch15.emergLights) ch15.emergLights.forEach(function(l){l.intensity=3+Math.sin(clock.elapsedTime*8)*2;});
+    }
+    if(ch15.timerLeft<=0){triggerLockdownFailure();return;}
+  }
+  /* Check alien clear */
+  if(ch15.timerStarted&&!ch15.aliensCleared){
+    var alive=ch15.spawnedAliens.filter(function(a){return a.health>0;}).length;
+    if(alive===0){ch15.aliensCleared=true;showMsg('ALL CONTACTS ELIMINATED — REACH COMMS TERMINAL',3000);beep(600,.1,'sine',.2);beep(900,.1,'sine',.15,.1);}
+  }
+  /* Proximity checks */
+  var px=camera.position.x,pz=camera.position.z;
+  /* Hayes proximity */
+  if(ch15.hayes){
+    var hx=ch15.hayes.mesh.position.x-px,hz=ch15.hayes.mesh.position.z-pz;
+    ch15.nearHayes=(Math.sqrt(hx*hx+hz*hz)<3.5);
+  }
+  /* Security terminal proximity x=-62 z=-38 */
+  var tx=(-62)-px,tz=(-38)-pz;
+  ch15.terminalNear=(Math.sqrt(tx*tx+tz*tz)<2.8);
+  /* Comms terminal proximity x=-50 z=-55 */
+  var cx=(-50)-px,cz=(-55)-pz;
+  ch15.commsNear=(Math.sqrt(cx*cx+cz*cz)<2.8);
+}
+
+/* ===== KEY CARD INTEGRATION ===== */
+/* Command keycard is type 'command', handled in interact() */
+
+/* ===== INTERACT UPDATE: add ch15 interactions ===== */
+var _origInteractFn=interact;
+interact=function(){
+  /* Command keycard door */
+  if(nearDoor&&nearDoor.key==='command'&&!nearDoor.open){
+    if(game.keys.command){nearDoor.opening=true;snd.door();showMsg('COMMUNICATIONS WING — UNLOCKED');ch15.wingUnlocked=true;}
+    else{snd.locked();showMsg('LOCKED — COMMAND KEYCARD REQUIRED');}
+    return;
+  }
+  /* Hayes briefing */
+  if(ch15.active&&ch15.nearHayes&&!ch15.hasKeycard){openHayesBriefing();return;}
+  if(ch15.active&&ch15.nearHayes&&ch15.hasKeycard&&!ch15.commsRestored){openHayesBriefing();return;}
+  /* Security terminal */
+  if(ch15.active&&ch15.terminalNear){activateSecurityTerminal();return;}
+  /* Comms terminal */
+  if(ch15.active&&ch15.commsNear){activateCommsTerminal();return;}
+  _origInteractFn();
+};
+
+/* ===== PROMPT UPDATE: add ch15 prompts ===== */
+/* (handled in main loop section below — updatePrompt) */
+
+/* ===== WEAPONS ===== */
+/* Pulse Rifle viewmodel — fully distinct from pistol */
+var pulseRifle=new THREE.Group();
+var prBody=new THREE.Mesh(new THREE.BoxGeometry(.26,.2,1.0),new THREE.MeshStandardMaterial({color:0x1a2a1a,metalness:.55,roughness:.35}));
+prBody.position.set(0,0,-.05);pulseRifle.add(prBody);
+var prBarrel=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.75,10),new THREE.MeshStandardMaterial({color:0x0d0d10,metalness:.85,roughness:.2}));
+prBarrel.rotation.x=Math.PI/2;prBarrel.position.set(0,.04,-.68);pulseRifle.add(prBarrel);
+var prTip=new THREE.Mesh(new THREE.CylinderGeometry(.06,.04,.12,10),new THREE.MeshStandardMaterial({color:0x00ff88,emissive:0x00ff88,emissiveIntensity:2.5}));
+prTip.rotation.x=Math.PI/2;prTip.position.set(0,.04,-1.08);pulseRifle.add(prTip);
+var prScope=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.3,10),new THREE.MeshStandardMaterial({color:0x222,metalness:.6}));
+prScope.rotation.x=Math.PI/2;prScope.position.set(0,.18,.0);pulseRifle.add(prScope);
+var prLens=new THREE.Mesh(new THREE.CircleGeometry(.06,10),new THREE.MeshStandardMaterial({color:0x2266ff,emissive:0x1144cc,emissiveIntensity:.9,transparent:true,opacity:.8}));
+prLens.rotation.y=Math.PI/2;prLens.position.set(0,.18,-.16);pulseRifle.add(prLens);
+var prCell=new THREE.Mesh(new THREE.BoxGeometry(.12,.32,.2),new THREE.MeshStandardMaterial({color:0x002200,emissive:0x00cc44,emissiveIntensity:1.4}));
+prCell.position.set(.22,-.08,.05);pulseRifle.add(prCell);
+var prGrip=new THREE.Mesh(new THREE.BoxGeometry(.1,.28,.1),new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:.9}));
+prGrip.position.set(0,-.2,-.3);pulseRifle.add(prGrip);
+var prStock=new THREE.Mesh(new THREE.BoxGeometry(.2,.24,.38),new THREE.MeshStandardMaterial({color:0x152215,roughness:.7}));
+prStock.position.set(0,-.05,.52);pulseRifle.add(prStock);
+var prGlow=new THREE.PointLight(0x00ff88,1.2,3);prGlow.position.set(0,.04,-1.1);pulseRifle.add(prGlow);
+pulseRifle.position.set(.3,-.28,-.56);
+pulseRifle.visible=false;
+camera.add(pulseRifle);
+
+function switchWeapon(to){
+  var hasPulse=inventory.pulseOwned;
+  if(to==='pulse'&&!hasPulse){showMsg('PULSE RIFLE NOT ACQUIRED');return;}
+  weapon=to;
+  gun.visible=(to==='pistol');
+  pulseRifle.visible=(to==='pulse');
+  document.getElementById('weaponLine').textContent='WEAPON: '+(to==='pulse'?'PULSE RIFLE':'PISTOL');
+  updateInventoryHud();
+}
+var weapon='pistol';
+
+/* ===== GRENADES ===== */
+var grenades=[];
+var grenadeCount=0;
+function throwGrenade(){
+  if(grenadeCount<=0){showMsg('NO GRENADES');return;}
+  grenadeCount--;updateGrenadeHud();
+  var dir=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+  var gm=new THREE.Mesh(new THREE.SphereGeometry(.15,6,6),new THREE.MeshStandardMaterial({color:0x2a4a2a,metalness:.6}));
+  gm.position.copy(camera.position);
+  var gvel={x:dir.x*12,y:5,z:dir.z*12};
+  scene.add(gm);
+  grenades.push({mesh:gm,vel:gvel,born:clock.elapsedTime,exploded:false});
+}
+function updateGrenades(dt,t){
+  for(var gi=grenades.length-1;gi>=0;gi--){
+    var g=grenades[gi];
+    if(g.exploded){scene.remove(g.mesh);g.mesh.geometry.dispose();g.mesh.material.dispose();grenades.splice(gi,1);continue;}
+    g.vel.y-=18*dt;
+    g.mesh.position.x+=g.vel.x*dt;g.mesh.position.y+=g.vel.y*dt;g.mesh.position.z+=g.vel.z*dt;
+    if(g.mesh.position.y<.2){g.mesh.position.y=.2;g.vel.y*=-.45;g.vel.x*=.6;g.vel.z*=.6;}
+    if(t-g.born>3&&!g.exploded){
+      g.exploded=true;
+      var ep=g.mesh.position.clone();
+      var el=new THREE.PointLight(0xff8800,8,16);el.position.copy(ep);
+      addTempLight(el,400);
+      flashOrange();snd.growl();
+      aliens.forEach(function(a){if(a.health<=0)return;var dx=a.group.position.x-ep.x,dz=a.group.position.z-ep.z;var d=Math.sqrt(dx*dx+dz*dz);if(d<8){a.health-=60*(1-d/8);if(a.health<=0){a.group.visible=false;game.credits+=10;}}});
+      var pd=Math.sqrt(Math.pow(camera.position.x-ep.x,2)+Math.pow(camera.position.z-ep.z,2));
+      if(pd<8){game.health-=40*(1-pd/8);snd.hurt();flashRed();if(game.health<=0)loseGame();}
+    }
+  }
+}
+function updateGrenadeHud(){document.getElementById('grenadeCount').textContent=grenadeCount>0?'GRENADES: '+grenadeCount:'GRENADES: --';}
+
+/* ===== INVENTORY ===== */
+/* inventory, shopBought, npcs declared above in GAME STATE block — do not redeclare */
+function updateInventoryHud(){
+  var s1=document.getElementById('slot1');var s2=document.getElementById('slot2');
+  if(s1)s1.className='invSlot'+(weapon==='pistol'?' active':'');
+  if(s2)s2.className='invSlot'+(inventory.pulseOwned?'':' locked')+(weapon==='pulse'?' active':'');
+  var gl=document.getElementById('grenLabel');var ml=document.getElementById('medLabel');
+  if(gl)gl.textContent='×'+grenadeCount;
+  if(ml)ml.textContent='×'+inventory.medkits;
+}
+window.selectSlot=function(n){
+  if(n===1)switchWeapon('pistol');
+  else if(n===2){if(inventory.pulseOwned)switchWeapon('pulse');else showMsg('PULSE RIFLE NOT ACQUIRED');}
+};
+
+/* ===== SHOP ===== */
+/* shopBought declared in GAME STATE block above */
+var shopDefs=[
+  {id:'ammo',name:'AMMUNITION PACK',cost:20,desc:'×30 rounds'},
+  {id:'medkit',name:'MEDKIT',cost:30,desc:'Heals 40 HP — press H'},
+  {id:'pulse',name:'PULSE RIFLE',cost:80,desc:'High-damage energy weapon'},
+  {id:'armour',name:'ARMOUR PLATING',cost:60,desc:'+30 max HP'},
+  {id:'grenade',name:'FRAG GRENADE ×2',cost:25,desc:'Explosive radius 8m'},
+];
+function openShop(){
+  var ov=document.getElementById('shopOverlay');
+  document.getElementById('shopCredits').textContent=game.credits+' CR';
+  var items=document.getElementById('shopItems');items.innerHTML='';
+  shopDefs.forEach(function(s){
+    var already=(s.id==='pulse'&&shopBought.pulseBought)||(s.id==='armour'&&shopBought.armourBought);
+    var div=document.createElement('div');div.className='shopItem';
+    var btn='<button '+(game.credits<s.cost||already?'disabled':'')+' onclick="window.buyItem(\''+s.id+'\')">'+(already?'OWNED':'BUY')+'</button>';
+    div.innerHTML='<span class="itemName">'+s.name+'<br><span style="font-size:9px;color:#445;letter-spacing:1px;">'+s.desc+'</span></span><span class="itemCost">'+s.cost+' CR</span>'+btn;
+    items.appendChild(div);
+  });
+  document.getElementById('lunarPrompt').textContent='';
+  ov.style.display='flex';logOpen=true;document.exitPointerLock();
+}
+window.closeShop=function(){document.getElementById('shopOverlay').style.display='none';logOpen=false;var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});};
+window.buyItem=function(id){
+  var def=shopDefs.find(function(s){return s.id===id;});
+  if(!def||game.credits<def.cost) return;
+  game.credits-=def.cost;
+  var msg=document.getElementById('shopMsg');
+  if(id==='ammo'){game.ammo+=30;msg.textContent='+ 30 AMMO';}
+  else if(id==='medkit'){inventory.medkits++;updateInventoryHud();msg.textContent='MEDKIT ADDED';}
+  else if(id==='pulse'){shopBought.pulseBought=true;inventory.pulseOwned=true;updateInventoryHud();msg.textContent='PULSE RIFLE ACQUIRED — PRESS 2';}
+  else if(id==='armour'){shopBought.armourBought=true;game.maxHealth+=30;msg.textContent='ARMOUR +30 MAX HP';}
+  else if(id==='grenade'){grenadeCount+=2;updateGrenadeHud();msg.textContent='+ 2 GRENADES';}
+  snd.pickup();document.getElementById('shopCredits').textContent=game.credits+' CR';openShop();
+};
+
+/* H key medkit */
+addEventListener('keydown',function(e){
+  if(e.key.toLowerCase()==='h'&&inventory.medkits>0&&game.health<game.maxHealth){
+    inventory.medkits--;game.health=Math.min(game.maxHealth,game.health+40);
+    snd.pickup();showMsg('+40 HP');updateInventoryHud();updateHud();
+  }
+  if(e.key==='1')switchWeapon('pistol');
+  if(e.key==='2'){if(inventory.pulseOwned)switchWeapon('pulse');else showMsg('PULSE RIFLE NOT ACQUIRED');}
+  if(e.key.toLowerCase()==='g'&&grenadeCount>0)throwGrenade();
+});
+
+/* ===== NPC / SHOP STATE ===== */
+/* npcs, nearShop declared in GAME STATE block above */
+function openNpc(n){
+  var ov=document.getElementById('npcOverlay');
+  document.getElementById('npcName').textContent=n.name||'CREW MEMBER';
+  document.getElementById('npcText').textContent=n.text||'...';
+  ov.style.display='flex';logOpen=true;document.exitPointerLock();
+}
+
+
+document.getElementById('startBtn').addEventListener('click',function(){
+  audioInit();game.started=true;document.getElementById('startScreen').style.display='none';
+  var r=document.body.requestPointerLock();if(r&&r.catch)r.catch(function(){});
+});
+animate();
+</script>
+</body>
+</html>
